@@ -8,7 +8,6 @@ LedMagnetController::LedMagnetController(std::shared_ptr<ISerialPort> serialPort
 	: lastSendTime(0.0f)
 	, totalTime(0.0f)
 	, sampleCount(0)
-	, serialPort(serialPort)
 	, lastSentRGB(0, 0, 0) // Initialize lastSentRGB
 	, lastSentMainLED(0)
 	, lastSentPWM(0)
@@ -17,7 +16,8 @@ LedMagnetController::LedMagnetController(std::shared_ptr<ISerialPort> serialPort
 	, lastSentArc(0)
 	, rgbInitialized(false)
 	, mainLedInitialized(false)
-	, pwmInitialized(false) {
+	, pwmInitialized(false)
+	, serialPort(serialPort) {
 }
 
 LedMagnetController::~LedMagnetController() {
@@ -223,8 +223,7 @@ bool LedMagnetController::send(const std::vector<uint8_t> & data) {
 			sampleCount--;
 		}
 		if (sampleCount > 0) { // Prevent division by zero if all samples were removed
-			float averageTime = totalTime / sampleCount;
-			// ofLogNotice("LedMagnetController") << "Average send interval: " << averageTime * 1000.0f << " ms (" << sampleCount << " samples)";
+			// Removed unused averageTime calculation
 		}
 	}
 
@@ -325,4 +324,59 @@ void LedMagnetController::setGammaCorrection(float gamma) {
 void LedMagnetController::setMinimumThreshold(uint8_t threshold) {
 	minThreshold = threshold;
 	lutInitialized = false;
+}
+
+// LED Circle System Helper Functions
+int LedMagnetController::getCircleBlendValue(int circleNumber) {
+	switch (circleNumber) {
+	case 1:
+		return CIRCLE_1_BLEND; // 0 - Inner circle
+	case 2:
+		return CIRCLE_2_BLEND; // 384 - Middle circle
+	case 3:
+		return CIRCLE_3_BLEND; // 768 - Outer circle
+	default:
+		return CIRCLE_1_BLEND; // Default to circle 1
+	}
+}
+
+int LedMagnetController::calculateBlendTransition(int fromCircle, int toCircle, float progress) {
+	if (fromCircle < 1 || fromCircle > 3 || toCircle < 1 || toCircle > 3) {
+		return CIRCLE_1_BLEND; // Default to circle 1 on invalid input
+	}
+
+	// Clamp progress to 0.0-1.0
+	progress = OSCHelper::clamp(progress, 0.0f, 1.0f);
+
+	int fromBlend = getCircleBlendValue(fromCircle);
+	int toBlend = getCircleBlendValue(toCircle);
+
+	// Linear interpolation between circles
+	return static_cast<int>(fromBlend + (toBlend - fromBlend) * progress);
+}
+
+bool LedMagnetController::isArcActive(int currentAngle, int origin, int arcEnd) {
+	// Normalize all angles to 0-360 range
+	currentAngle = currentAngle % 360;
+	if (currentAngle < 0) currentAngle += 360;
+
+	origin = origin % 360;
+	if (origin < 0) origin += 360;
+
+	arcEnd = arcEnd % 360;
+	if (arcEnd < 0) arcEnd += 360;
+
+	// Special case: if origin equals arcEnd, consider full circle active
+	if (origin == arcEnd) {
+		return true;
+	}
+
+	// Check if current angle is within the arc
+	if (origin <= arcEnd) {
+		// Arc doesn't cross 0 degrees
+		return currentAngle >= origin && currentAngle <= arcEnd;
+	} else {
+		// Arc crosses 0 degrees (e.g., from 350° to 10°)
+		return currentAngle >= origin || currentAngle <= arcEnd;
+	}
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "HourGlassManager.h"
+#include "LEDVisualizer.h"
 #include "ofMain.h"
 #include "ofxGui.h"
 #include "ofxOscParameterSync.h"
@@ -39,6 +40,9 @@ public:
 	// Methods to update UI elements from external changes (e.g., OSC)
 	void updateGlobalLuminositySlider(float luminosity);
 	void updateCurrentIndividualLuminositySlider(float luminosity);
+
+	// LED Visualizer access
+	LEDVisualizer & getLEDVisualizer() { return ledVisualizer; }
 
 	// Global Luminosity Panel and Parameters (public for access if needed, though typically managed internally)
 	ofxPanel globalSettingsPanel; // Panel to hold global settings like luminosity
@@ -168,4 +172,6 @@ private:
 	void setColorPreset(const ofColor & color);
 
 	void onIndividualLuminosityChanged(float & luminosity); // Listener for individual luminosity slider
+
+	LEDVisualizer ledVisualizer;
 };

@@ -32,6 +32,21 @@ void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl) {
 	// Setup all listeners
 	setupListeners();
 
+	// Setup LED visualizer - small preview below luminosity panel
+	ledVisualizer.setup(200, 120); // Bigger size
+	ledVisualizer.setLayoutMode(0); // Grid layout
+	ledVisualizer.setShowLabels(false); // No labels for compact view
+	ledVisualizer.setShowGrid(false);
+	ledVisualizer.setUIWrapper(this); // Give visualizer access to UI parameters
+
+	// Add all hourglasses to visualizer
+	for (int i = 0; i < hourglassManager->getHourGlassCount(); i++) {
+		auto * hg = hourglassManager->getHourGlass(i);
+		if (hg) {
+			ledVisualizer.addHourGlass(hg, "HG " + ofToString(i + 1));
+		}
+	}
+
 	// Sync selector with current selection
 	hourglassSelectorParam = currentHourGlass + 1;
 
@@ -47,6 +62,9 @@ void UIWrapper::update() {
 
 	// Update serial statistics
 	SerialPortManager::getInstance().updateStats();
+
+	// Update LED visualizer
+	ledVisualizer.update();
 
 	// Debug: Check parameter values
 	static int debugFrameCount = 0;
@@ -66,6 +84,11 @@ void UIWrapper::draw() {
 
 	// Draw enhanced status panel
 	drawStatus();
+
+	// Draw LED visualizer at specified coordinates
+	int visualizerX = 980;
+	int visualizerY = 90;
+	ledVisualizer.draw(visualizerX, visualizerY);
 }
 
 void UIWrapper::setupPanels() {
@@ -955,7 +978,6 @@ void UIWrapper::loadSettings() {
 // Implement the new listener method
 void UIWrapper::onGlobalLuminosityChanged(float & luminosity) {
 	LedMagnetController::setGlobalLuminosity(luminosity);
-	ofLogNotice("UIWrapper") << "💡 Global Luminosity changed via UI to: " << luminosity;
 	if (oscControllerInstance) {
 		oscControllerInstance->forceRefreshAllHardwareStates();
 	}
@@ -967,7 +989,6 @@ void UIWrapper::onIndividualLuminosityChanged(float & luminosity) {
 		// Set the ofParameter on the HourGlass object.
 		// This will trigger HourGlass's own internal listeners if it has any to apply changes.
 		hg->individualLuminosity.set(luminosity);
-		ofLogNotice("UIWrapper") << "💡 Individual Luminosity UI for HG " << (currentHourGlass + 1) << " changed to: " << luminosity;
 
 		// Force OSCController to re-evaluate and send all states because effective output will change
 		if (oscControllerInstance) {
@@ -1011,7 +1032,6 @@ void UIWrapper::onUpLedBlendChanged(int & value) {
 
 			ofColor downColor = hg->downLedColor.get();
 			hg->getDownLedMagnet()->sendLED(downColor.r, downColor.g, downColor.b, value, downLedOriginParam.get(), downLedArcParam.get(), hg->individualLuminosity.get());
-			ofLogNotice("UIWrapper") << "🔄 UI: Synced down LED blend to " << value;
 		}
 	} else {
 	}
@@ -1026,8 +1046,6 @@ void UIWrapper::onUpLedOriginChanged(int & value) {
 		ofColor upColor = hg->upLedColor.get();
 
 		hg->getUpLedMagnet()->sendLED(upColor.r, upColor.g, upColor.b, upLedBlendParam.get(), value, upLedArcParam.get(), hg->individualLuminosity.get());
-
-		ofLogNotice("UIWrapper") << "📍 UI: Up LED Origin changed to " << value << "° for hourglass " << (currentHourGlass + 1) << " with indivLum=" << hg->individualLuminosity.get();
 
 		// If sync is enabled, also update down LED origin
 		if (syncColorsParam.get()) {
@@ -1052,8 +1070,6 @@ void UIWrapper::onUpLedArcChanged(int & value) {
 		ofColor upColor = hg->upLedColor.get();
 
 		hg->getUpLedMagnet()->sendLED(upColor.r, upColor.g, upColor.b, upLedBlendParam.get(), upLedOriginParam.get(), value, hg->individualLuminosity.get());
-
-		ofLogNotice("UIWrapper") << "🌅 UI: Up LED Arc changed to " << value << "° for hourglass " << (currentHourGlass + 1) << " with indivLum=" << hg->individualLuminosity.get();
 
 		// If sync is enabled, also update down LED arc
 		if (syncColorsParam.get()) {
@@ -1100,8 +1116,6 @@ void UIWrapper::onDownLedOriginChanged(int & value) {
 
 		hg->getDownLedMagnet()->sendLED(downColor.r, downColor.g, downColor.b, downLedBlendParam.get(), value, downLedArcParam.get(), hg->individualLuminosity.get());
 
-		ofLogNotice("UIWrapper") << "📍 UI: Down LED Origin changed to " << value << "° for hourglass " << (currentHourGlass + 1) << " with indivLum=" << hg->individualLuminosity.get();
-
 		// If sync is enabled, also update up LED origin
 		if (syncColorsParam.get()) {
 			upLedOriginParam.removeListener(this, &UIWrapper::onUpLedOriginChanged);
@@ -1122,8 +1136,6 @@ void UIWrapper::onDownLedArcChanged(int & value) {
 		ofColor downColor = hg->downLedColor.get();
 
 		hg->getDownLedMagnet()->sendLED(downColor.r, downColor.g, downColor.b, downLedBlendParam.get(), downLedOriginParam.get(), value, hg->individualLuminosity.get());
-
-		ofLogNotice("UIWrapper") << "🌅 UI: Down LED Arc changed to " << value << "° for hourglass " << (currentHourGlass + 1) << " with indivLum=" << hg->individualLuminosity.get();
 
 		// If sync is enabled, also update up LED arc
 		if (syncColorsParam.get()) {

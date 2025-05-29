@@ -89,6 +89,25 @@ public:
 	bool mainLedInitialized = false;
 	bool pwmInitialized = false;
 
+	// RGB optimization static variables
+	static uint8_t gammaLUT[256];
+	static float currentGamma;
+	static uint8_t minThreshold;
+	static bool lutInitialized;
+
+	// LED Circle System Constants
+	static const int CIRCLE_1_BLEND = 0; // Inner circle (32 LEDs)
+	static const int CIRCLE_2_BLEND = 384; // Middle circle (36 LEDs) - scaled to 768 range
+	static const int CIRCLE_3_BLEND = 768; // Outer circle (42 LEDs)
+
+	// LED Circle Helper Functions
+	static int getCircleBlendValue(int circleNumber); // 1, 2, or 3 -> blend value
+	static int calculateBlendTransition(int fromCircle, int toCircle, float progress); // 0.0-1.0
+	static bool isArcActive(int currentAngle, int origin, int arcEnd);
+
+	// RGB optimization methods
+	static void initializeLUT();
+
 private:
 	std::shared_ptr<ISerialPort> serialPort;
 	std::string connectedPortName;
@@ -108,13 +127,6 @@ private:
 	static T clamp(T value, T min, T max) {
 		return std::max(min, std::min(value, max));
 	}
-
-	// RGB optimization static data
-	static uint8_t gammaLUT[256];
-	static float currentGamma;
-	static uint8_t minThreshold;
-	static bool lutInitialized;
-	static void initializeLUT();
 
 	// Global luminosity static data
 	static float globalLuminosityValue;
