@@ -111,6 +111,9 @@ addons/*/libs/
 # config.make
 # addons.make
 
+# Development helper scripts (not tracked in repository)
+commit.sh
+
 # Logs and debug files
 *.log
 debug.txt

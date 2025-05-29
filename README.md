@@ -1,6 +1,6 @@
 # Myriades Project - HourGlass LED Control System
 
-![Myriades HourGlass Control System](emptyExample.png)
+![Myriades HourGlass Control System](screenshot.jpg)
 
 An open source comprehensive control system for multi-hourglass LED installations built with openFrameworks. This application provides intuitive GUI controls and extensive OSC API support for managing LED effects, motor controls, and electromagnetic systems across multiple hourglass units.
 
