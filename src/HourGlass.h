@@ -1,0 +1,98 @@
+#pragma once
+
+#include "LedMagnetController.h"
+#include "MotorController.h"
+#include "SerialPortManager.h"
+#include "ofMain.h"
+#include "ofParameter.h"
+#include "ofxOsc.h"
+#include <memory>
+#include <string>
+#include <vector>
+
+class HourGlass {
+public:
+	// Constructor
+	explicit HourGlass(const std::string & name = "HourGlass");
+	~HourGlass();
+
+	// Configuration
+	void configure(const std::string & serialPort, int baudRate,
+		int upLedId, int downLedId, int motorId);
+
+	// Connection management
+	bool connect();
+	bool isConnected() const;
+	void disconnect();
+
+	// Access to controllers
+	LedMagnetController * getUpLedMagnet() { return upLedMagnet.get(); }
+	LedMagnetController * getDownLedMagnet() { return downLedMagnet.get(); }
+	MotorController * getMotor() { return motor.get(); }
+
+	// Convenience methods for common operations
+	void enableMotor();
+	void disableMotor();
+	void emergencyStop();
+	void setAllLEDs(uint8_t r, uint8_t g, uint8_t b);
+
+	// Parameter-driven methods for OSC/GUI sync
+	void applyMotorParameters();
+	void applyLedParameters();
+
+	// Status
+	std::string getName() const { return name; }
+	std::string getSerialPort() const { return serialPortName; }
+	int getBaudRate() const { return baudRate; }
+	int getUpLedId() const { return upLedId; }
+	int getDownLedId() const { return downLedId; }
+	int getMotorId() const { return motorId; }
+
+	// Shared Parameters for OSC/GUI synchronization using ofParameterGroup
+	ofParameterGroup params { "HourGlass" };
+
+	// Motor parameters
+	ofParameter<bool> motorEnabled { "motorEnabled", false };
+	ofParameter<int> microstep { "microstep", 16, 1, 256 };
+	ofParameter<int> motorSpeed { "motorSpeed", 100, 0, 500 };
+	ofParameter<int> motorAcceleration { "motorAcceleration", 128, 0, 255 };
+	ofParameter<float> gearRatio { "gearRatio", 15.0f, 0.01f, 1000.0f };
+	ofParameter<float> calibrationFactor { "calibrationFactor", 1.0f, 0.01f, 1000.0f };
+
+	// LED parameters
+	ofParameter<ofColor> upLedColor { "upLedColor", ofColor::black };
+	ofParameter<ofColor> downLedColor { "downLedColor", ofColor::black };
+	ofParameter<int> upMainLed { "upMainLed", 0, 0, 255 };
+	ofParameter<int> downMainLed { "downMainLed", 0, 0, 255 };
+	ofParameter<int> upPwm { "upPwm", 0, 0, 255 };
+	ofParameter<int> downPwm { "downPwm", 0, 0, 255 };
+	ofParameter<float> individualLuminosity { "individualLuminosity", 1.0f, 0.0f, 1.0f };
+
+	// OSC update flag
+	bool updatingFromOSC;
+
+	// For rate-limiting LED commands to hardware
+	float lastLedCommandSendTime;
+	static const float MIN_LED_COMMAND_INTERVAL_MS;
+
+private:
+	std::string name;
+	std::string serialPortName;
+	int baudRate;
+
+	// Controllers
+	std::unique_ptr<LedMagnetController> upLedMagnet;
+	std::unique_ptr<LedMagnetController> downLedMagnet;
+	std::unique_ptr<MotorController> motor;
+
+	// Configuration IDs
+	int upLedId;
+	int downLedId;
+	int motorId;
+
+	std::shared_ptr<ISerialPort> sharedSerialPort;
+	bool connected;
+
+	// Helper methods
+	void setupControllers();
+};

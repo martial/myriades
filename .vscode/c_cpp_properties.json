@@ -1,0 +1,69 @@
+{
+	"configurations": [
+		{
+			"name": "openFrameworks",
+			"includePath": [
+				"${workspaceFolder}/src",
+				"${workspaceFolder}/../../../libs/openFrameworks",
+				"${workspaceFolder}/../../../libs/openFrameworks/ofMain.h",
+				"${workspaceFolder}/../../../libs/openFrameworks/3d",
+				"${workspaceFolder}/../../../libs/openFrameworks/app",
+				"${workspaceFolder}/../../../libs/openFrameworks/communication",
+				"${workspaceFolder}/../../../libs/openFrameworks/events",
+				"${workspaceFolder}/../../../libs/openFrameworks/gl",
+				"${workspaceFolder}/../../../libs/openFrameworks/graphics",
+				"${workspaceFolder}/../../../libs/openFrameworks/math",
+				"${workspaceFolder}/../../../libs/openFrameworks/sound",
+				"${workspaceFolder}/../../../libs/openFrameworks/types",
+				"${workspaceFolder}/../../../libs/openFrameworks/utils",
+				"${workspaceFolder}/../../../libs/openFrameworks/video",
+				"${workspaceFolder}/../../../libs/FreeImage/include",
+				"${workspaceFolder}/../../../libs/freetype/include",
+				"${workspaceFolder}/../../../libs/glew/include",
+				"${workspaceFolder}/../../../libs/glfw/include",
+				"${workspaceFolder}/../../../libs/glm/include",
+				"${workspaceFolder}/../../../libs/json/include",
+				"${workspaceFolder}/../../../libs/curl/include",
+				"${workspaceFolder}/../../../libs/libpng/include",
+				"${workspaceFolder}/../../../libs/openssl/include",
+				"${workspaceFolder}/../../../libs/rtAudio/include",
+				"${workspaceFolder}/../../../libs/utf8/include",
+				"${workspaceFolder}/../../../libs/zlib/include",
+				"${workspaceFolder}/../../../libs/pugixml/include",
+				"${workspaceFolder}/../../../libs/tess2/include",
+				"${workspaceFolder}/../../../libs/uriparser/include",
+				"${workspaceFolder}/../../../libs/pixman/include",
+				"${workspaceFolder}/../../../libs/cairo/include",
+				"${workspaceFolder}/../../../libs/fmt/include",
+				"${workspaceFolder}/../../../libs/brotli/include",
+				"${workspaceFolder}/../../../addons/ofxGui/src",
+				"${workspaceFolder}/../../../addons/ofxOsc/src",
+				"${workspaceFolder}/../../../addons/ofxOsc/libs",
+				"${workspaceFolder}/../../../addons/ofxOsc/libs/oscpack",
+				"${workspaceFolder}/../../../addons/ofxOsc/libs/oscpack/src",
+				"${workspaceFolder}/../../../addons/ofxOsc/libs/oscpack/src/osc",
+				"${workspaceFolder}/../../../addons/ofxOsc/libs/oscpack/src/ip",
+				"${workspaceFolder}/../../../addons/ofxOsc/libs/oscpack/src/ip/posix"
+			],
+			"defines": [
+				"TARGET_OSX",
+				"USE_FMOD=0",
+				"__MACOSX_CORE__",
+				"GLM_FORCE_CTOR_INIT",
+				"GLM_ENABLE_EXPERIMENTAL"
+			],
+			"compilerPath": "/usr/bin/clang++",
+			"cStandard": "c17",
+			"cppStandard": "c++17",
+			"intelliSenseMode": "macos-clang-x64",
+			"compilerArgs": [
+				"-stdlib=libc++",
+				"-mmacosx-version-min=10.15"
+			],
+			"forcedInclude": [
+				"${workspaceFolder}/../../../libs/openFrameworks/ofMain.h"
+			]
+		}
+	],
+	"version": 4
+}

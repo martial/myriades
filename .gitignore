@@ -1,0 +1,135 @@
+# openFrameworks Project .gitignore
+
+# Build outputs and binaries
+bin/
+!bin/data/
+obj/
+*.app
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
+*.xcscheme
+DerivedData/
+build/
+
+# Visual Studio Code
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.vscode/extensions.json
+.vscode/.ropeproject
+
+# Visual Studio
+*.vcxproj.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+Debug/
+Release/
+x64/
+.vs/
+
+# Code::Blocks
+*.layout
+*.depend
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.cache
+
+# IDE and editor files
+*.swp
+*.swo
+*~
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node modules (if using any web tools)
+node_modules/
+
+# OpenFrameworks specific
+addons/*/libs/
+
+# Project specific
+# Uncomment these if you don't want to track certain config files
+# config.make
+# addons.make
+
+# Logs and debug files
+*.log
+debug.txt
+error.log
+
+# Data files that might be large or user-specific
+# Uncomment if you have large data files that shouldn't be tracked
+# bin/data/videos/
+# bin/data/sounds/large_files/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Package managers
+*.tar.gz
+*.zip
+*.rar
+
+# Documentation builds
+docs/build/ 
