@@ -1,4 +1,4 @@
-# HourGlass OSC API Reference (v1.0.6+)
+# Myriades Project - HourGlass OSC API Reference (v1.0.6+)
 
 ## Overview
 - **OSC Receive Port**: `8000`

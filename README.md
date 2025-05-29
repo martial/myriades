@@ -1,35 +1,35 @@
-# HourGlass LED Control System
+# Myriades Project - HourGlass LED Control System
 
-![HourGlass Control System](emptyExample.png)
+![Myriades HourGlass Control System](emptyExample.png)
 
-A comprehensive control system for multi-hourglass LED installations built with openFrameworks. This application provides intuitive GUI controls and extensive OSC API support for managing LED effects, motor controls, and electromagnetic systems across multiple hourglass units.
+An open source comprehensive control system for multi-hourglass LED installations built with openFrameworks. This application provides intuitive GUI controls and extensive OSC API support for managing LED effects, motor controls, and electromagnetic systems across multiple hourglass units.
 
 ## Features
 
-### 🎨 LED Control System
+### LED Control System
 - **RGB LED Control**: Full color control for UP and DOWN LEDs on each hourglass
 - **Effect Parameters**: Advanced blend, origin, and arc parameters for LED effects
 - **Main LED Support**: Individual brightness control for main LEDs
 - **Global & Individual Luminosity**: Dual-layer brightness control system
 - **Gamma Correction**: Built-in gamma correction and minimum threshold optimization
 
-### 🔄 Motor Control
+### Motor Control
 - **Precise Movement**: Absolute and relative angle positioning
 - **Speed & Acceleration**: Configurable movement parameters
 - **Motor Presets**: Pre-defined speed/acceleration combinations (slow, smooth, medium, fast)
 - **Emergency Stop**: Safety controls for immediate motor shutdown
 - **Gear Ratio Support**: Customizable gear ratios and calibration factors
 
-### 🔌 Electromagnetic Controls
+### Electromagnetic Controls
 - **PWM Control**: Variable electromagnetic field strength control
 - **Independent Control**: Separate UP/DOWN electromagnet management
 
-### 🌐 OSC API
+### OSC API
 - **Multi-Targeting**: Support for single IDs, comma-separated lists (1,3), ranges (1-3), and "all"
 - **Comprehensive Commands**: 40+ OSC commands for complete system control
 - **Real-time Control**: Low-latency command processing and hardware communication
 
-### 🖥️ User Interface
+### User Interface
 - **Multi-Hourglass Management**: Support for multiple connected hourglasses
 - **Real-time Monitoring**: Connection status and serial communication statistics
 - **Parameter Sliders**: Intuitive controls for all LED and motor parameters
@@ -45,8 +45,8 @@ A comprehensive control system for multi-hourglass LED installations built with 
 ### Building
 ```bash
 # Clone the repository
-git clone [your-repo-url]
-cd HourglassControl
+git clone https://github.com/YOUR_USERNAME/myriades-project.git
+cd myriades-project
 
 # Build using make
 make Release
@@ -147,17 +147,29 @@ Real-time monitoring of serial communication with rolling averages:
 - Bytes per second tracking
 - Connection status monitoring
 
+## Open Source
+
+This project is released under the MIT License, making it free to use, modify, and distribute. We welcome contributions from the community to help improve and extend the system's capabilities.
+
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+We welcome contributions to the Myriades Project! Here's how you can help:
+
+1. **Fork the repository** on GitHub
+2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
+3. **Commit your changes** (`git commit -m 'Add amazing feature'`)
+4. **Push to the branch** (`git push origin feature/amazing-feature`)
+5. **Open a Pull Request**
+
+### Development Guidelines
+- Follow the existing code style and structure
+- Add documentation for new features
+- Test your changes thoroughly
+- Update the OSC API documentation if adding new commands
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Technical Specifications
 
@@ -169,6 +181,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - **PWM Range**: 0-255
 - **Effect Parameters**: Blend (0-768), Origin/Arc (0-360°)
 
+## Support
+
+For questions, bug reports, or feature requests, please open an issue on GitHub.
+
 ## Acknowledgments
 
-Built with openFrameworks and ofxOsc addon for robust real-time multimedia control.
+Built with openFrameworks and ofxOsc addon for robust real-time multimedia control. This open source project is part of the Myriades initiative.
