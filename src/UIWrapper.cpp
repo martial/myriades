@@ -429,11 +429,61 @@ void UIWrapper::drawStatus() {
 
 	// === RIGHT SECTION: SERIAL STATISTICS ===
 	ofSetColor(255); // White text
-	ofDrawBitmapString("SERIAL STATISTICS", rightTextX, rightTextY);
-	rightTextY += lineHeight * 1.2;
+	float titleY = rightTextY; // Capture Y before it's incremented for stats lines
+	ofDrawBitmapString("SERIAL STATISTICS", rightTextX, titleY);
 
-	// Serial Statistics
+	// --- Bandwidth Usage Indicator ---
 	auto serialStats = SerialPortManager::getInstance().getStats();
+	float baudRateBps = 28800.0f; // 230400 / 8
+	float usagePercentage = 0.0f;
+	if (baudRateBps > 0) {
+		usagePercentage = (serialStats.avgBytesPerSecond_1s / baudRateBps) * 100.0f;
+		usagePercentage = std::max(0.0f, std::min(usagePercentage, 100.0f)); // Clamp to 0-100%
+	}
+
+	ofColor usageBarColor = ofColor::darkGreen;
+	ofColor usageTextColor = ofColor::white;
+
+	if (usagePercentage >= 70.0f) {
+		usageBarColor = ofColor::darkRed;
+		usageTextColor = ofColor(255, 180, 180); // Lighter red for text on dark red
+	} else if (usagePercentage >= 30.0f) {
+		usageBarColor = ofColor::darkOrange; // ofColor::orange might be too bright
+		usageTextColor = ofColor::white; // White on orange is usually fine
+	}
+
+	// Position and dimensions for the bar
+	int barMaxWidth = 100; // Max width of the bar
+	int barHeight = lineHeight * 0.7f; // Make bar slightly shorter than text line
+	int barX = rightTextX + 140; // Position it to the right of the title text
+	// Align bar's vertical center with the approximate vertical center of the title text
+	// Bitmap string draws from baseline, so textY is baseline. Bar Y is top.
+	// A common heuristic is to shift bar Y up by a bit more than half its height from text baseline.
+	int barY = titleY - barHeight * 0.6f; // Adjust this factor for precise vertical alignment
+	float currentBarWidth = ofMap(usagePercentage, 0, 100, 0, barMaxWidth, true);
+
+	// Draw background for the bar (e.g., a darker shade)
+	ofSetColor(50, 50, 50); // Dark grey background for the bar
+	ofDrawRectangle(barX, barY, barMaxWidth, barHeight);
+
+	// Draw the usage bar
+	ofSetColor(usageBarColor);
+	ofDrawRectangle(barX, barY, currentBarWidth, barHeight);
+
+	// Draw outline for the bar
+	ofSetColor(80, 80, 80);
+	ofNoFill();
+	ofDrawRectangle(barX, barY, barMaxWidth, barHeight);
+	ofFill();
+
+	// Draw percentage text - aim to vertically center it with the bar
+	ofSetColor(usageTextColor);
+	std::string usageText = ofToString(usagePercentage, 1) + "%";
+	// Adjust Y for text to align its baseline better with the bar's vertical center
+	ofDrawBitmapString(usageText, barX + barMaxWidth + 8, barY + barHeight * 0.8f); // Shifted text slightly right too
+	// --- End Bandwidth Usage Indicator ---
+
+	rightTextY += lineHeight * 1.2; // Move down for next stats line (this was original Y increment for title)
 
 	// Instant values (current frame/second)
 	ofSetColor(180, 180, 180);
@@ -442,7 +492,6 @@ void UIWrapper::drawStatus() {
 	ofDrawBitmapString("B/s: " + ofToString(serialStats.avgBytesPerSecond, 0), rightTextX + 80, rightTextY);
 
 	// 1-second average
-	ofSetColor(220, 220, 220);
 	ofDrawBitmapString("1s avg:", rightTextX, rightTextY += lineHeight);
 	ofDrawBitmapString("C: " + ofToString(serialStats.avgCallsPerSecond_1s, 1), rightTextX, rightTextY += lineHeight);
 	ofDrawBitmapString("B: " + ofToString(serialStats.avgBytesPerSecond_1s, 0), rightTextX + 80, rightTextY);

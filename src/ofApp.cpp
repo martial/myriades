@@ -2,7 +2,7 @@
 
 //--------------------------------------------------------------
 void ofApp::setup() {
-	ofSetWindowTitle("🔧 HourGlass Control System v1.0");
+	ofSetWindowTitle("Myriades Control System v1.0");
 	ofSetFrameRate(60);
 	ofSetWindowShape(1200, 800);
 
