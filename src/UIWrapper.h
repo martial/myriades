@@ -12,6 +12,12 @@ class OSCController; // Forward declaration for the pointer
 
 class UIWrapper {
 public:
+	// Add this enum definition
+	enum ViewMode {
+		DETAILED_VIEW,
+		MINIMAL_VIEW
+	};
+
 	UIWrapper();
 	~UIWrapper();
 
@@ -71,6 +77,9 @@ public:
 	static const float OSC_ACTIVITY_FADE_TIME; // How long the dot stays visible
 
 private:
+	// Add this member variable
+	ViewMode currentViewMode;
+
 	OSCController * oscControllerInstance = nullptr; // Pointer to OSCController
 	HourGlassManager * hourglassManager;
 	ofParameterGroup parameters; // Main parameter group for all UI elements
@@ -176,6 +185,7 @@ private:
 	void handleConnectionCommands(int key);
 	void handleMotorCommands(int key);
 	void handleLEDCommands(int key);
+	void handleViewToggle(int key); // Added declaration
 
 	// Throttling for color updates
 	float lastColorUpdateTime;
@@ -198,4 +208,7 @@ private:
 	// NEW METHODS: Fix for hourglass selection bug
 	void updateUIPanelsBinding();
 	void updateListenersForCurrentHourglass();
+
+	// Add this method declaration
+	void drawMinimalView();
 };

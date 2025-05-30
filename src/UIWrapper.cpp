@@ -2,6 +2,7 @@
 #include "ArcCosineEffect.h"
 #include "OSCController.h"
 #include "SerialPortManager.h"
+#include "ofMain.h"
 
 // OSC activity tracking constants
 const float UIWrapper::OSC_ACTIVITY_FADE_TIME = 1.5f; // Dot visible for 1.5 seconds
@@ -12,7 +13,8 @@ UIWrapper::UIWrapper()
 	, currentHourGlass(0)
 	, lastColorUpdateTime(0)
 	, isUpdatingFromEffects(false)
-	, lastOSCMessageTime(0) {
+	, lastOSCMessageTime(0)
+	, currentViewMode(DETAILED_VIEW) {
 	lastUpColor = ofColor::black;
 	lastDownColor = ofColor::black;
 }
@@ -93,22 +95,54 @@ void UIWrapper::update() {
 }
 
 void UIWrapper::draw() {
-	// Draw all horizontal panels
-	settingsPanel.draw();
-	motorPanel.draw();
-	ledUpPanel.draw();
-	ledDownPanel.draw();
-	luminosityPanel.draw();
-	effectsPanel.draw();
-	// globalSettingsPanel.draw(); // Removed: Will be part of settingsPanel
+	if (currentViewMode == DETAILED_VIEW) {
+		// Draw all horizontal panels
+		settingsPanel.draw();
+		motorPanel.draw();
+		ledUpPanel.draw();
+		ledDownPanel.draw();
+		luminosityPanel.draw();
+		effectsPanel.draw();
+		// globalSettingsPanel.draw(); // Removed: Will be part of settingsPanel
 
-	// Draw enhanced status panel
-	drawStatus();
+		// Draw enhanced status panel
+		drawStatus();
 
-	// Draw LED visualizer at specified coordinates
-	int visualizerX = 980;
-	int visualizerY = 90;
-	ledVisualizer.draw(visualizerX, visualizerY);
+		// Draw LED visualizer at specified coordinates
+		int visualizerX = 980;
+		int visualizerY = 90;
+		ledVisualizer.draw(visualizerX, visualizerY);
+	} else if (currentViewMode == MINIMAL_VIEW) {
+		drawMinimalView();
+	}
+}
+
+void UIWrapper::drawMinimalView() {
+	// Placeholder implementation
+	ofSetBackgroundColor(0); // Black background for minimal view
+	// ofSetColor(255); // Color will be set by individual HourGlass::drawMinimal calls
+	// ofDrawBitmapString("MINIMAL VIEW - TODO: Implement HourGlass::drawMinimal() and call it here for each HG", 20, 20);
+
+	if (hourglassManager) {
+		int yOffset = 20; // Initial Y offset
+		int xOffset = 20; // Initial X offset
+		int columnWidth = 280; // Estimated width of one minimal HG view, adjust as needed
+		int rowHeight = 150; // Estimated height of one minimal HG view, adjust as needed
+		int maxCols = ofGetWidth() / columnWidth;
+		int currentCol = 0;
+
+		for (int i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
+			HourGlass * hg = hourglassManager->getHourGlass(i);
+			if (hg) {
+				hg->drawMinimal(xOffset + (currentCol * columnWidth), yOffset);
+				currentCol++;
+				if (currentCol >= maxCols) {
+					currentCol = 0;
+					yOffset += rowHeight;
+				}
+			}
+		}
+	}
 }
 
 void UIWrapper::setupPanels() {
@@ -489,6 +523,7 @@ void UIWrapper::handleKeyPressed(int key) {
 	handleConnectionCommands(key);
 	handleMotorCommands(key);
 	handleLEDCommands(key);
+	handleViewToggle(key);
 }
 
 void UIWrapper::handleHourGlassSelection(int key) {
@@ -569,6 +604,18 @@ void UIWrapper::handleLEDCommands(int key) {
 	// Handle save shortcut separately to check for modifier keys
 	if (key == 's' && (ofGetKeyPressed(OF_KEY_COMMAND) || ofGetKeyPressed(OF_KEY_CONTROL))) {
 		saveSettings();
+	}
+}
+
+void UIWrapper::handleViewToggle(int key) {
+	if (key == 'v') { // 'v' for view toggle
+		if (currentViewMode == DETAILED_VIEW) {
+			currentViewMode = MINIMAL_VIEW;
+			ofLogNotice("UIWrapper") << "Switched to Minimal View";
+		} else {
+			currentViewMode = DETAILED_VIEW;
+			ofLogNotice("UIWrapper") << "Switched to Detailed View";
+		}
 	}
 }
 

@@ -102,6 +102,9 @@ public:
 	void commandRelativeAngle(float degrees, std::optional<int> speed = std::nullopt, std::optional<int> accel = std::nullopt);
 	void commandAbsoluteAngle(float degrees, std::optional<int> speed = std::nullopt, std::optional<int> accel = std::nullopt);
 
+	// New method for minimal view drawing
+	void drawMinimal(float x, float y);
+
 private:
 	std::string name;
 	std::string serialPortName;
@@ -140,4 +143,21 @@ private:
 
 	// Helper methods
 	void setupControllers();
+
+	// Helper for minimal view
+	ofRectangle drawSingleLedControllerMinimal(float x, float y, const std::string & label,
+		const ofColor & color, int blend, int origin, int arc,
+		float globalLum, float individualLum, bool isUpController);
+
+	// Constants for drawing, adapted from LEDVisualizer
+	static const int NUM_LEDS_CIRCLE_1 = 32;
+	static const int NUM_LEDS_CIRCLE_2 = 36;
+	static const int NUM_LEDS_CIRCLE_3 = 42;
+	static constexpr float MINIMAL_CIRCLE_1_RADIUS = 30.0f;
+	static constexpr float MINIMAL_CIRCLE_2_RADIUS = 45.0f;
+	static constexpr float MINIMAL_CIRCLE_3_RADIUS = 60.0f;
+
+	float getMinimalCircleAlpha(int circleIndex, int blend);
+	bool isMinimalAngleInArc(float currentAngleDegrees, int startAngleDegrees, int arcSpanDegrees);
+	float normalizeMinimalAngle(float angle);
 };
