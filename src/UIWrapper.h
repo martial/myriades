@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ArcCosineEffect.h"
 #include "HourGlassManager.h"
 #include "LEDVisualizer.h"
 #include "ofMain.h"
@@ -44,6 +45,14 @@ public:
 	// LED Visualizer access
 	LEDVisualizer & getLEDVisualizer() { return ledVisualizer; }
 
+	// Methods for OSCController to update UI parameters safely
+	void updateUpLedBlendFromOSC(int value);
+	void updateUpLedOriginFromOSC(int value);
+	void updateUpLedArcFromOSC(int value);
+	void updateDownLedBlendFromOSC(int value);
+	void updateDownLedOriginFromOSC(int value);
+	void updateDownLedArcFromOSC(int value);
+
 	// Global Luminosity Panel and Parameters (public for access if needed, though typically managed internally)
 	ofxPanel globalSettingsPanel; // Panel to hold global settings like luminosity
 	ofParameter<float> globalLuminosityParam; // UI Parameter for global luminosity
@@ -70,6 +79,7 @@ private:
 	ofxPanel ledUpPanel; // Panel for UP LED controls
 	ofxPanel ledDownPanel; // Panel for DOWN LED controls
 	ofxPanel luminosityPanel; // Panel for luminosity and main LED controls
+	ofxPanel effectsPanel; // New panel for effects
 
 	// Parameters for UI elements (will be added to panels)
 	ofParameter<int> hourglassSelectorParam;
@@ -174,4 +184,11 @@ private:
 	void onIndividualLuminosityChanged(float & luminosity); // Listener for individual luminosity slider
 
 	LEDVisualizer ledVisualizer;
+
+	// Listeners for new buttons
+	void onAddCosineArcEffectPressed();
+	void onClearAllEffectsPressed();
+
+	ofxButton addCosineArcEffectBtn;
+	ofxButton clearAllEffectsBtn;
 };

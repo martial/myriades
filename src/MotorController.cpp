@@ -29,6 +29,10 @@ MotorController::ConnectionResult MotorController::connect(const std::string & p
 	connectedPortName = portName;
 	ofLogNotice("MotorController") << "Connected to motor device: " << portName;
 
+	// Reset initialized flags on new connection
+	motorEnabledStateInitialized = false;
+	microstepInitialized = false;
+
 	return ConnectionResult::SUCCESS;
 }
 
@@ -81,15 +85,26 @@ MotorController & MotorController::setRemote(bool remote) {
 }
 
 // Motor control functions
-MotorController & MotorController::enable(bool enabled) {
-	send({ static_cast<uint8_t>(MotorCommand::ENABLE), enabled ? uint8_t(1) : uint8_t(0) });
+MotorController & MotorController::enable(bool enabled_command) {
+	if (motorEnabledStateInitialized && enabled_command == lastMotorEnabledState) {
+		return *this; // No change, don't send
+	}
+	send({ static_cast<uint8_t>(MotorCommand::ENABLE), enabled_command ? uint8_t(1) : uint8_t(0) });
+	lastMotorEnabledState = enabled_command;
+	motorEnabledStateInitialized = true;
 	return *this;
 }
 
 MotorController & MotorController::setMicrostep(int ustep) {
-	ustep = clamp(ustep, 1, 256);
-	currentMicrostep = ustep; // Store the current microstep value
+	ustep = local_clamp(ustep, 1, 256);
+
+	if (microstepInitialized && ustep == lastMicrostepValue) {
+		return *this; // No change, don't send
+	}
+	currentMicrostep = ustep;
 	send({ static_cast<uint8_t>(MotorCommand::SET_USTEP), static_cast<uint8_t>(ustep % 256) });
+	lastMicrostepValue = ustep;
+	microstepInitialized = true;
 	return *this;
 }
 

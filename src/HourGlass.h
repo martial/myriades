@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Effect.h"
+#include "EffectParameters.h"
+#include "EffectsManager.h"
 #include "LedMagnetController.h"
 #include "MotorController.h"
 #include "SerialPortManager.h"
@@ -7,6 +10,7 @@
 #include "ofParameter.h"
 #include "ofxOsc.h"
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -68,12 +72,34 @@ public:
 	ofParameter<int> downPwm { "downPwm", 0, 0, 255 };
 	ofParameter<float> individualLuminosity { "individualLuminosity", 1.0f, 0.0f, 1.0f };
 
+	// New ofParameters for LED effects base values
+	ofParameter<int> upLedBlend { "upLedBlend", 0, 0, 768 };
+	ofParameter<int> upLedOrigin { "upLedOrigin", 0, 0, 360 };
+	ofParameter<int> upLedArc { "upLedArc", 360, 0, 360 }; // Default to full arc
+
+	ofParameter<int> downLedBlend { "downLedBlend", 0, 0, 768 };
+	ofParameter<int> downLedOrigin { "downLedOrigin", 0, 0, 360 };
+	ofParameter<int> downLedArc { "downLedArc", 360, 0, 360 }; // Default to full arc
+
 	// OSC update flag
 	bool updatingFromOSC;
 
 	// For rate-limiting LED commands to hardware
 	float lastLedCommandSendTime;
 	static const float MIN_LED_COMMAND_INTERVAL_MS;
+
+	// Effects Management
+	void updateEffects(float deltaTime);
+	void addUpEffect(std::unique_ptr<Effect> effect);
+	void addDownEffect(std::unique_ptr<Effect> effect);
+	void clearUpEffects();
+	void clearDownEffects();
+
+	// New Motor Command Intent Methods
+	void commandRelativeMove(int steps, std::optional<int> speed = std::nullopt, std::optional<int> accel = std::nullopt);
+	void commandAbsoluteMove(int position, std::optional<int> speed = std::nullopt, std::optional<int> accel = std::nullopt);
+	void commandRelativeAngle(float degrees, std::optional<int> speed = std::nullopt, std::optional<int> accel = std::nullopt);
+	void commandAbsoluteAngle(float degrees, std::optional<int> speed = std::nullopt, std::optional<int> accel = std::nullopt);
 
 private:
 	std::string name;
@@ -92,6 +118,24 @@ private:
 
 	std::shared_ptr<ISerialPort> sharedSerialPort;
 	bool connected;
+
+	EffectsManager upEffectsManager;
+	EffectsManager downEffectsManager;
+
+	// Motor Command Intent State
+	bool executeRelativeMove = false;
+	int targetRelativeSteps = 0;
+	std::optional<int> pendingMoveSpeed;
+	std::optional<int> pendingMoveAccel;
+
+	bool executeAbsoluteMove = false;
+	int targetAbsolutePosition = 0;
+
+	bool executeRelativeAngle = false;
+	float targetRelativeDegrees = 0.0f;
+
+	bool executeAbsoluteAngle = false;
+	float targetAbsoluteDegrees = 0.0f;
 
 	// Helper methods
 	void setupControllers();

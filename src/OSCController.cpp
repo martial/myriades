@@ -181,14 +181,10 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 	if (command == "enable") {
 		if (!OSCHelper::validateParameters(msg, 1, "motor_enable")) return;
 		bool enable = OSCHelper::getArgument<bool>(msg, 0, true);
-		if (enable)
-			hg->enableMotor();
-		else
-			hg->disableMotor();
 		hg->updatingFromOSC = true;
 		hg->motorEnabled.set(enable);
 		hg->updatingFromOSC = false;
-		ofLogNotice("OSCController") << "⚡ OSC: Motor " << (enable ? "enabled" : "disabled") << " for hourglass " << hourglassId;
+		ofLogNotice("OSCController") << "⚡ OSC: Motor enabled state set to " << (enable ? "true" : "false") << " for hourglass " << hourglassId;
 	} else if (command == "emergency_stop") {
 		motor->emergencyStop();
 		hg->emergencyStop();
@@ -207,7 +203,6 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		hg->microstep.set(microstep);
 		hg->updatingFromOSC = false;
 		hg->applyMotorParameters();
-		// ofLogNotice("OSCController") << "🔧 OSC: Set microstep to " << microstep << " for hourglass " << hourglassId;
 	} else if (command == "speed") {
 		if (!OSCHelper::validateParameters(msg, 1, "motor_speed")) return;
 		int speed_val = OSCHelper::getArgument<int>(msg, 0, 100);
@@ -218,7 +213,6 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		hg->updatingFromOSC = true;
 		hg->motorSpeed.set(speed_val);
 		hg->updatingFromOSC = false;
-		// ofLogNotice("OSCController") << "🏃 OSC: Set default motor speed to " << speed_val << " for hourglass " << hourglassId;
 	} else if (command == "acceleration") {
 		if (!OSCHelper::validateParameters(msg, 1, "motor_acceleration")) return;
 		int accel_val = OSCHelper::getArgument<int>(msg, 0, 128);
@@ -229,121 +223,67 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		hg->updatingFromOSC = true;
 		hg->motorAcceleration.set(accel_val);
 		hg->updatingFromOSC = false;
-		// ofLogNotice("OSCController") << "🚀 OSC: Set default acceleration to " << accel_val << " (0-255) for hourglass " << hourglassId;
 	} else if (command == "move_relative") {
-		handleMotorRelativeMessage(msg, hg, addressParts);
+		if (!OSCHelper::validateParameters(msg, 1, "motor_move_relative")) return;
+		int steps = OSCHelper::getArgument<int>(msg, 0, 0);
+		std::optional<int> speed_opt = msg.getNumArgs() > 1 ? std::optional<int>(OSCHelper::getArgument<int>(msg, 1)) : std::nullopt;
+		std::optional<int> accel_opt = msg.getNumArgs() > 2 ? std::optional<int>(OSCHelper::getArgument<int>(msg, 2)) : std::nullopt;
+		hg->commandRelativeMove(steps, speed_opt, accel_opt);
+		ofLogNotice("OSCController") << "↕️ OSC: Commanded relative move " << steps << " for HG " << hourglassId;
 	} else if (command == "move_absolute") {
-		handleMotorAbsoluteMessage(msg, hg, addressParts);
+		if (!OSCHelper::validateParameters(msg, 1, "motor_move_absolute")) return;
+		int position = OSCHelper::getArgument<int>(msg, 0, 0);
+		std::optional<int> speed_opt = msg.getNumArgs() > 1 ? std::optional<int>(OSCHelper::getArgument<int>(msg, 1)) : std::nullopt;
+		std::optional<int> accel_opt = msg.getNumArgs() > 2 ? std::optional<int>(OSCHelper::getArgument<int>(msg, 2)) : std::nullopt;
+		hg->commandAbsoluteMove(position, speed_opt, accel_opt);
+		ofLogNotice("OSCController") << "📍 OSC: Commanded absolute move to " << position << " for HG " << hourglassId;
 	} else if (command == "rotate") {
-		float degrees;
-		int rotate_speed;
-		int rotate_accel; // Stays int
+		float degrees_val;
+		std::optional<int> speed_opt = std::nullopt;
+		std::optional<int> accel_opt = std::nullopt;
 		if (addressParts.size() >= 5) {
 			try {
-				degrees = std::stof(addressParts[4]);
-				rotate_speed = (addressParts.size() >= 6) ? std::stoi(addressParts[5]) : hg->motorSpeed.get();
-				rotate_accel = (addressParts.size() >= 7) ? std::stoi(addressParts[6]) : hg->motorAcceleration.get();
+				degrees_val = std::stof(addressParts[4]);
+				if (addressParts.size() >= 6) speed_opt = std::stoi(addressParts[5]);
+				if (addressParts.size() >= 7) accel_opt = std::stoi(addressParts[6]);
 			} catch (const std::exception &) {
 				sendError(address, "Invalid path format for rotate");
 				return;
 			}
 		} else {
 			if (!OSCHelper::validateParameters(msg, 1, "motor_rotate")) return;
-			degrees = OSCHelper::getArgument<float>(msg, 0, 0.0f);
-			rotate_speed = OSCHelper::getArgument<int>(msg, 1, hg->motorSpeed.get());
-			rotate_accel = OSCHelper::getArgument<int>(msg, 2, hg->motorAcceleration.get());
+			degrees_val = OSCHelper::getArgument<float>(msg, 0, 0.0f);
+			if (msg.getNumArgs() > 1) speed_opt = OSCHelper::getArgument<int>(msg, 1);
+			if (msg.getNumArgs() > 2) accel_opt = OSCHelper::getArgument<int>(msg, 2);
 		}
-		if (!OSCHelper::isValidAngle(degrees) || !OSCHelper::isValidMotorSpeed(rotate_speed) || !OSCHelper::isValidMotorAcceleration(rotate_accel)) { // Validates 0-255 for accel
-			OSCHelper::logError("motor_rotate", address, "Invalid rotation parameters. Speed: " + ofToString(rotate_speed) + " Accel (0-255): " + ofToString(rotate_accel));
-			return;
-		}
-		bool speedChanged = (rotate_speed != hg->motorSpeed.get());
-		bool accelChanged = (rotate_accel != hg->motorAcceleration.get());
-		if (speedChanged || accelChanged) {
-			hg->updatingFromOSC = true;
-			if (speedChanged) {
-				hg->motorSpeed.set(rotate_speed);
-				ofLogNotice("OSCController") << "🏃 OSC: Updated UI speed to " << rotate_speed;
-			}
-			if (accelChanged) {
-				hg->motorAcceleration.set(rotate_accel);
-				ofLogNotice("OSCController") << "🚀 OSC: Updated UI acceleration to " << rotate_accel;
-			}
-			hg->updatingFromOSC = false;
-		}
-		motor->moveRelativeAngle(rotate_speed, rotate_accel, degrees, hg->gearRatio.get(), hg->calibrationFactor.get());
-		updateUIAngleParameters(degrees, 0);
+		hg->commandRelativeAngle(degrees_val, speed_opt, accel_opt);
+		updateUIAngleParameters(degrees_val, 0);
+		ofLogNotice("OSCController") << "🔄 OSC: Commanded relative angle " << degrees_val << " for HG " << hourglassId;
 	} else if (command == "position") {
-		float degrees;
-		int pos_speed;
-		int pos_accel; // Stays int
+		float degrees_val;
+		std::optional<int> speed_opt = std::nullopt;
+		std::optional<int> accel_opt = std::nullopt;
 		if (addressParts.size() >= 5) {
 			try {
-				degrees = std::stof(addressParts[4]);
-				pos_speed = (addressParts.size() >= 6) ? std::stoi(addressParts[5]) : hg->motorSpeed.get();
-				pos_accel = (addressParts.size() >= 7) ? std::stoi(addressParts[6]) : hg->motorAcceleration.get();
+				degrees_val = std::stof(addressParts[4]);
+				if (addressParts.size() >= 6) speed_opt = std::stoi(addressParts[5]);
+				if (addressParts.size() >= 7) accel_opt = std::stoi(addressParts[6]);
 			} catch (const std::exception &) {
 				sendError(address, "Invalid path format for position");
 				return;
 			}
 		} else {
 			if (!OSCHelper::validateParameters(msg, 1, "motor_position")) return;
-			degrees = OSCHelper::getArgument<float>(msg, 0, 0.0f);
-			pos_speed = OSCHelper::getArgument<int>(msg, 1, hg->motorSpeed.get());
-			pos_accel = OSCHelper::getArgument<int>(msg, 2, hg->motorAcceleration.get());
+			degrees_val = OSCHelper::getArgument<float>(msg, 0, 0.0f);
+			if (msg.getNumArgs() > 1) speed_opt = OSCHelper::getArgument<int>(msg, 1);
+			if (msg.getNumArgs() > 2) accel_opt = OSCHelper::getArgument<int>(msg, 2);
 		}
-		if (!OSCHelper::isValidAngle(degrees) || !OSCHelper::isValidMotorSpeed(pos_speed) || !OSCHelper::isValidMotorAcceleration(pos_accel)) { // Validates 0-255 for accel
-			OSCHelper::logError("motor_position", address, "Invalid position parameters. Speed: " + ofToString(pos_speed) + " Accel (0-255): " + ofToString(pos_accel));
-			return;
-		}
-		bool speedChanged = (pos_speed != hg->motorSpeed.get());
-		bool accelChanged = (pos_accel != hg->motorAcceleration.get());
-		if (speedChanged || accelChanged) {
-			hg->updatingFromOSC = true;
-			if (speedChanged) {
-				hg->motorSpeed.set(pos_speed);
-				ofLogNotice("OSCController") << "🏃 OSC: Updated UI speed to " << pos_speed;
-			}
-			if (accelChanged) {
-				hg->motorAcceleration.set(pos_accel);
-				ofLogNotice("OSCController") << "🚀 OSC: Updated UI acceleration to " << pos_accel;
-			}
-			hg->updatingFromOSC = false;
-		}
-		motor->moveAbsoluteAngle(pos_speed, pos_accel, degrees, hg->gearRatio.get(), hg->calibrationFactor.get());
-		updateUIAngleParameters(0, degrees);
-		ofLogNotice("OSCController") << "🎯 OSC: Position to " << degrees << "° (absolute) at speed " << pos_speed << ", accel " << pos_accel << " for hourglass " << hourglassId;
+		hg->commandAbsoluteAngle(degrees_val, speed_opt, accel_opt);
+		updateUIAngleParameters(0, degrees_val);
+		ofLogNotice("OSCController") << "🎯 OSC: Commanded absolute angle to " << degrees_val << " for HG " << hourglassId;
 	} else {
 		sendError(address, "Unknown motor command: " + command);
 	}
-}
-
-void OSCController::handleMotorRelativeMessage(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts) {
-	string address = msg.getAddress();
-	if (!OSCHelper::validateParameters(msg, 1, "motor_move_relative")) return;
-	int steps = OSCHelper::getArgument<int>(msg, 0, 0);
-	int speed = OSCHelper::getArgument<int>(msg, 1, hg->motorSpeed.get());
-	float accel = OSCHelper::getArgument<float>(msg, 2, hg->motorAcceleration.get());
-	if (!OSCHelper::isValidMotorSpeed(speed) || !OSCHelper::isValidMotorAcceleration(accel)) {
-		sendError(address, "Invalid motor parameters");
-		return;
-	}
-	hg->getMotor()->moveRelative(speed, accel, steps);
-	ofLogNotice("OSCController") << "↕️ OSC: Move relative " << steps << " steps for hourglass " << extractHourglassId(addressParts);
-}
-
-void OSCController::handleMotorAbsoluteMessage(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts) {
-	string address = msg.getAddress();
-	if (!OSCHelper::validateParameters(msg, 1, "motor_move_absolute")) return;
-	int position = OSCHelper::getArgument<int>(msg, 0, 0);
-	int speed = OSCHelper::getArgument<int>(msg, 1, hg->motorSpeed.get());
-	float accel = OSCHelper::getArgument<float>(msg, 2, hg->motorAcceleration.get());
-	if (!OSCHelper::isValidMotorSpeed(speed) || !OSCHelper::isValidMotorAcceleration(accel)) {
-		sendError(address, "Invalid motor parameters");
-		return;
-	}
-	hg->getMotor()->moveAbsolute(speed, accel, position);
-	ofLogNotice("OSCController") << "📍 OSC: Move absolute to " << position << " for hourglass " << extractHourglassId(addressParts);
 }
 
 void OSCController::handleLedMessage(ofxOscMessage & msg) {
@@ -413,106 +353,112 @@ void OSCController::handleLedMessage(ofxOscMessage & msg) {
 
 void OSCController::handleIndividualLedMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, int hourglassId, const string & target, const string & command, const vector<string> & addressParts) {
 	string address = msg.getAddress();
+	bool shouldUpdateUI = uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1);
+
+	hg->updatingFromOSC = true;
 
 	if (command == "rgb") {
-		if (!OSCHelper::validateParameters(msg, 3, "led_rgb")) return;
+		if (!OSCHelper::validateParameters(msg, 3, "led_rgb")) {
+			hg->updatingFromOSC = false;
+			return;
+		}
 		int r = OSCHelper::getArgument<int>(msg, 0, 0), g = OSCHelper::getArgument<int>(msg, 1, 0), b = OSCHelper::getArgument<int>(msg, 2, 0);
 		if (!OSCHelper::isValidColorValue(r) || !OSCHelper::isValidColorValue(g) || !OSCHelper::isValidColorValue(b)) {
 			sendError(address, "Invalid RGB values (0-255)");
+			hg->updatingFromOSC = false;
 			return;
 		}
-		hg->updatingFromOSC = true;
 		if (target == "up")
 			hg->upLedColor.set(ofColor(r, g, b));
 		else
 			hg->downLedColor.set(ofColor(r, g, b));
-		hg->updatingFromOSC = false;
 	} else if (command == "brightness") {
-		if (!OSCHelper::validateParameters(msg, 1, "led_brightness")) return;
+		if (!OSCHelper::validateParameters(msg, 1, "led_brightness")) {
+			hg->updatingFromOSC = false;
+			return;
+		}
 		int brightness = OSCHelper::getArgument<int>(msg, 0, 0);
 		if (!OSCHelper::isValidColorValue(brightness)) {
 			sendError(address, "Invalid brightness value (0-255)");
+			hg->updatingFromOSC = false;
 			return;
 		}
-		hg->updatingFromOSC = true;
 		if (target == "up")
 			hg->upLedColor.set(ofColor(brightness, brightness, brightness));
 		else
 			hg->downLedColor.set(ofColor(brightness, brightness, brightness));
-		hg->updatingFromOSC = false;
+
 	} else if (command == "blend") {
-		if (!OSCHelper::validateParameters(msg, 1, "led_blend")) return;
+		if (!OSCHelper::validateParameters(msg, 1, "led_blend")) {
+			hg->updatingFromOSC = false;
+			return;
+		}
 		int blend = OSCHelper::getArgument<int>(msg, 0, 0);
 		if (blend < 0 || blend > 768) {
 			sendError(address, "Invalid blend value (0-768)");
+			hg->updatingFromOSC = false;
 			return;
 		}
-		if (uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1)) {
-			hg->updatingFromOSC = true;
-			if (target == "up")
-				uiWrapper->upLedBlendParam.set(blend);
-			else
-				uiWrapper->downLedBlendParam.set(blend);
-			hg->updatingFromOSC = false;
+
+		if (shouldUpdateUI) {
+			if (target == "up") {
+				uiWrapper->updateUpLedBlendFromOSC(blend);
+			} else {
+				uiWrapper->updateDownLedBlendFromOSC(blend);
+			}
 		}
-		LastSentValues & lastSent = lastSentValues[hourglassId];
-		if (target == "up")
-			lastSent.upBlend = blend;
-		else
-			lastSent.downBlend = blend;
-		lastSent.initialized = false;
 	} else if (command == "origin") {
-		if (!OSCHelper::validateParameters(msg, 1, "led_origin")) return;
+		if (!OSCHelper::validateParameters(msg, 1, "led_origin")) {
+			hg->updatingFromOSC = false;
+			return;
+		}
 		int origin = OSCHelper::getArgument<int>(msg, 0, 0);
 		if (origin < 0 || origin > 360) {
 			sendError(address, "Invalid origin value (0-360)");
+			hg->updatingFromOSC = false;
 			return;
 		}
-		if (uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1)) {
-			hg->updatingFromOSC = true;
-			if (target == "up")
-				uiWrapper->upLedOriginParam.set(origin);
-			else
-				uiWrapper->downLedOriginParam.set(origin);
-			hg->updatingFromOSC = false;
+
+		if (shouldUpdateUI) {
+			if (target == "up") {
+				uiWrapper->updateUpLedOriginFromOSC(origin);
+			} else {
+				uiWrapper->updateDownLedOriginFromOSC(origin);
+			}
 		}
-		LastSentValues & lastSent = lastSentValues[hourglassId];
-		if (target == "up")
-			lastSent.upOrigin = origin;
-		else
-			lastSent.downOrigin = origin;
-		lastSent.initialized = false;
 	} else if (command == "arc") {
-		if (!OSCHelper::validateParameters(msg, 1, "led_arc")) return;
+		if (!OSCHelper::validateParameters(msg, 1, "led_arc")) {
+			hg->updatingFromOSC = false;
+			return;
+		}
 		int arc = OSCHelper::getArgument<int>(msg, 0, 360);
 		if (arc < 0 || arc > 360) {
 			sendError(address, "Invalid arc value (0-360)");
+			hg->updatingFromOSC = false;
 			return;
 		}
-		if (uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1)) {
-			hg->updatingFromOSC = true;
-			if (target == "up")
-				uiWrapper->upLedArcParam.set(arc);
-			else
-				uiWrapper->downLedArcParam.set(arc);
-			hg->updatingFromOSC = false;
+
+		if (shouldUpdateUI) {
+			if (target == "up") {
+				uiWrapper->updateUpLedArcFromOSC(arc);
+			} else {
+				uiWrapper->updateDownLedArcFromOSC(arc);
+			}
 		}
-		LastSentValues & lastSent = lastSentValues[hourglassId];
-		if (target == "up")
-			lastSent.upArc = arc;
-		else
-			lastSent.downArc = arc;
-		lastSent.initialized = false;
 	} else {
 		sendError(address, "Unknown " + target + " LED command: " + command);
 	}
+	hg->updatingFromOSC = false;
 }
 
 void OSCController::handleAllLedMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, int hourglassId, const string & command, const vector<string> & addressParts) {
 	string address = msg.getAddress();
+	bool shouldUpdateUI = uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1);
+
+	hg->updatingFromOSC = true;
 
 	if (command == "all") {
-		if (addressParts.size() == 5 && addressParts[4] == "rgb") {
+		if (addressParts.size() >= 5 && addressParts[4] == "rgb") {
 			if (msg.getNumArgs() == 3) {
 				int r, g, b;
 				if (msg.getArgType(0) == OFXOSC_TYPE_FLOAT) {
@@ -524,74 +470,65 @@ void OSCController::handleAllLedMessageForHourglass(ofxOscMessage & msg, HourGla
 					g = static_cast<uint8_t>(OSCHelper::clamp(OSCHelper::getArgument<int>(msg, 1), 0, 255));
 					b = static_cast<uint8_t>(OSCHelper::clamp(OSCHelper::getArgument<int>(msg, 2), 0, 255));
 				}
-				hg->updatingFromOSC = true;
 				hg->setAllLEDs(r, g, b);
-				hg->updatingFromOSC = false;
 			} else if (msg.getNumArgs() == 1 && msg.getArgType(0) == OFXOSC_TYPE_RGBA_COLOR) {
 				ofColor color = msg.getArgAsRgbaColor(0);
-				hg->updatingFromOSC = true;
 				hg->setAllLEDs(color.r, color.g, color.b);
-				hg->updatingFromOSC = false;
 			} else {
 				sendError(address, "Invalid RGB format. Expected 3 numbers or RGBA color type");
 			}
-		} else if (addressParts.size() == 5 && addressParts[4] == "blend") {
-			if (!OSCHelper::validateParameters(msg, 1, "led_all_blend")) return;
+		} else if (addressParts.size() >= 5 && addressParts[4] == "blend") {
+			if (!OSCHelper::validateParameters(msg, 1, "led_all_blend")) {
+				hg->updatingFromOSC = false;
+				return;
+			}
 			int blend = OSCHelper::getArgument<int>(msg, 0, 0);
 			if (blend < 0 || blend > 768) {
 				sendError(address, "Invalid blend value (0-768)");
+				hg->updatingFromOSC = false;
 				return;
 			}
-			if (uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1)) {
-				hg->updatingFromOSC = true;
-				uiWrapper->upLedBlendParam.set(blend);
-				uiWrapper->downLedBlendParam.set(blend);
-				hg->updatingFromOSC = false;
+			if (shouldUpdateUI) {
+				uiWrapper->updateUpLedBlendFromOSC(blend);
+				uiWrapper->updateDownLedBlendFromOSC(blend);
 			}
-			LastSentValues & lastSent = lastSentValues[hourglassId];
-			lastSent.upBlend = blend;
-			lastSent.downBlend = blend;
-			lastSent.initialized = false;
-		} else if (addressParts.size() == 5 && addressParts[4] == "origin") {
-			if (!OSCHelper::validateParameters(msg, 1, "led_all_origin")) return;
+		} else if (addressParts.size() >= 5 && addressParts[4] == "origin") {
+			if (!OSCHelper::validateParameters(msg, 1, "led_all_origin")) {
+				hg->updatingFromOSC = false;
+				return;
+			}
 			int origin = OSCHelper::getArgument<int>(msg, 0, 0);
 			if (origin < 0 || origin > 360) {
 				sendError(address, "Invalid origin value (0-360)");
+				hg->updatingFromOSC = false;
 				return;
 			}
-			if (uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1)) {
-				hg->updatingFromOSC = true;
-				uiWrapper->upLedOriginParam.set(origin);
-				uiWrapper->downLedOriginParam.set(origin);
-				hg->updatingFromOSC = false;
+			if (shouldUpdateUI) {
+				uiWrapper->updateUpLedOriginFromOSC(origin);
+				uiWrapper->updateDownLedOriginFromOSC(origin);
 			}
-			LastSentValues & lastSent = lastSentValues[hourglassId];
-			lastSent.upOrigin = origin;
-			lastSent.downOrigin = origin;
-			lastSent.initialized = false;
-		} else if (addressParts.size() == 5 && addressParts[4] == "arc") {
-			if (!OSCHelper::validateParameters(msg, 1, "led_all_arc")) return;
+		} else if (addressParts.size() >= 5 && addressParts[4] == "arc") {
+			if (!OSCHelper::validateParameters(msg, 1, "led_all_arc")) {
+				hg->updatingFromOSC = false;
+				return;
+			}
 			int arc = OSCHelper::getArgument<int>(msg, 0, 360);
 			if (arc < 0 || arc > 360) {
 				sendError(address, "Invalid arc value (0-360)");
+				hg->updatingFromOSC = false;
 				return;
 			}
-			if (uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1)) {
-				hg->updatingFromOSC = true;
-				uiWrapper->upLedArcParam.set(arc);
-				uiWrapper->downLedArcParam.set(arc);
-				hg->updatingFromOSC = false;
+			if (shouldUpdateUI) {
+				uiWrapper->updateUpLedArcFromOSC(arc);
+				uiWrapper->updateDownLedArcFromOSC(arc);
 			}
-			LastSentValues & lastSent = lastSentValues[hourglassId];
-			lastSent.upArc = arc;
-			lastSent.downArc = arc;
-			lastSent.initialized = false;
 		} else {
 			sendError(address, "Unknown 'all' LED command: " + (addressParts.size() > 4 ? addressParts[4] : " (expected rgb/blend/origin/arc)"));
 		}
 	} else {
 		sendError(address, "Unknown LED command: " + command);
 	}
+	hg->updatingFromOSC = false;
 }
 
 void OSCController::handlePWMMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, int hourglassId, const vector<string> & addressParts) {
@@ -611,6 +548,7 @@ void OSCController::handlePWMMessageForHourglass(ofxOscMessage & msg, HourGlass 
 		sendError(address, "Invalid PWM value (0-255)");
 		return;
 	}
+
 	hg->updatingFromOSC = true;
 	if (target == "up" || target == "all") hg->upPwm.set(pwmValue);
 	if (target == "down" || target == "all") hg->downPwm.set(pwmValue);
@@ -634,6 +572,7 @@ void OSCController::handleMainLedMessageForHourglass(ofxOscMessage & msg, HourGl
 		sendError(address, "Invalid Main LED value (0-255)");
 		return;
 	}
+
 	hg->updatingFromOSC = true;
 	if (target == "up" || target == "all") hg->upMainLed.set(ledValue);
 	if (target == "down" || target == "all") hg->downMainLed.set(ledValue);
@@ -679,21 +618,21 @@ void OSCController::handleGlobalLuminosityMessage(ofxOscMessage & msg) {
 	if (!OSCHelper::validateParameters(msg, 1, "system_luminosity")) return;
 
 	float luminosity = OSCHelper::getArgument<float>(msg, 0, 1.0f);
-	luminosity = OSCHelper::clamp(luminosity, 0.0f, 1.0f); // Ensure it's within bounds
+	luminosity = OSCHelper::clamp(luminosity, 0.0f, 1.0f);
 
 	LedMagnetController::setGlobalLuminosity(luminosity);
 	ofLogNotice("OSCController") << "💡 OSC: Global luminosity set to " << luminosity;
 	if (uiWrapper) {
 		uiWrapper->updateGlobalLuminositySlider(luminosity);
 	}
-	forceRefreshAllHardwareStates(); // Force re-send of all values
+	forceRefreshAllHardwareStates();
 }
 
 void OSCController::handleIndividualLuminosityMessage(ofxOscMessage & msg) {
 	string address = msg.getAddress();
 	vector<string> addressParts = splitAddress(address);
 
-	if (addressParts.size() < 3) { // Expect /hourglass/{id}/luminosity or transformed /hourglass/{id}/blackout
+	if (addressParts.size() < 3) {
 		OSCHelper::logError("IndividualLuminosity", address, "Incomplete address for individual luminosity/blackout.");
 		return;
 	}
@@ -710,19 +649,17 @@ void OSCController::handleIndividualLuminosityMessage(ofxOscMessage & msg) {
 		return;
 	}
 
-	// Argument 0 should be the luminosity value (float)
 	if (!OSCHelper::validateParameters(msg, 1, "individual_luminosity")) return;
-	float luminosityValue = OSCHelper::getArgument<float>(msg, 0, 1.0f); // Default to 1.0 if not provided (should be caught by validateParameters)
+	float luminosityValue = OSCHelper::getArgument<float>(msg, 0, 1.0f);
 	luminosityValue = OSCHelper::clamp(luminosityValue, 0.0f, 1.0f);
 
 	hg->individualLuminosity.set(luminosityValue);
 
-	// Update UI slider if this is the currently selected hourglass in the UI
 	if (uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1)) {
 		uiWrapper->updateCurrentIndividualLuminositySlider(luminosityValue);
 	}
 
-	forceRefreshAllHardwareStates(); // Force refresh as this specific HG's output will change
+	forceRefreshAllHardwareStates();
 }
 
 void OSCController::handleMotorPresetMessage(ofxOscMessage & msg) {
@@ -754,7 +691,6 @@ void OSCController::handleMotorPresetMessage(ofxOscMessage & msg) {
 		int newSpeed = it->second.first;
 		int newAccel = it->second.second;
 
-		// Validate preset values against allowed ranges (optional, but good practice)
 		if (!OSCHelper::isValidMotorSpeed(newSpeed) || !OSCHelper::isValidMotorAcceleration(newAccel)) {
 			sendError(address, "Preset '" + presetName + "' contains invalid speed/acceleration values.");
 			return;
@@ -774,7 +710,6 @@ void OSCController::handleMotorPresetMessage(ofxOscMessage & msg) {
 
 void OSCController::handleSystemMotorPresetMessage(ofxOscMessage & msg) {
 	string address = msg.getAddress();
-	// Expected format: /system/motor/preset [preset_name_string]
 	if (!OSCHelper::validateParameters(msg, 1, "system_motor_preset")) return;
 	std::string presetName = OSCHelper::getArgument<std::string>(msg, 0, "smooth");
 
@@ -805,13 +740,10 @@ void OSCController::handleSystemMotorPresetMessage(ofxOscMessage & msg) {
 
 void OSCController::handleSystemMotorConfigMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts) {
 	string address = msg.getAddress();
-	// Expected: /system/motor/config/{speed}/{accel}
-	// addressParts[0] = system, [1] = motor, [2] = config, [3] = speed, [4] = accel
 	if (addressParts.size() < 5) {
-		sendError(address, "Incomplete system motor config command.");
+		sendError(address, "Incomplete system motor config command. Expected /system/motor/config/{speed}/{accel}");
 		return;
 	}
-
 	try {
 		int speed_val = std::stoi(addressParts[3]);
 		int accel_val = std::stoi(addressParts[4]);
@@ -820,11 +752,10 @@ void OSCController::handleSystemMotorConfigMessage(ofxOscMessage & msg, const st
 			OSCHelper::logError("system_motor_config", address, "Invalid speed/acceleration. Speed(0-500): " + ofToString(speed_val) + ", Accel(0-255): " + ofToString(accel_val));
 			return;
 		}
-
 		ofLogNotice("OSCController") << "⚙️ OSC: System motor config applying to ALL hourglasses (Speed: " << speed_val << ", Accel: " << accel_val << ")";
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg && hg->isConnected()) {
+			if (hg) { // No need to check isConnected here, just set params
 				hg->updatingFromOSC = true;
 				hg->motorSpeed.set(speed_val);
 				hg->motorAcceleration.set(accel_val);
@@ -838,8 +769,6 @@ void OSCController::handleSystemMotorConfigMessage(ofxOscMessage & msg, const st
 
 void OSCController::handleIndividualMotorConfigMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts) {
 	string address = msg.getAddress();
-	// Expected: /hourglass/{id}/motor/config/{speed}/{accel}
-	// addressParts[0]=hourglass, [1]=id, [2]=motor, [3]=config, [4]=speed, [5]=accel
 	if (addressParts.size() < 6) {
 		sendError(address, "Incomplete individual motor config command.");
 		return;
@@ -876,27 +805,21 @@ void OSCController::handleIndividualMotorConfigMessage(ofxOscMessage & msg, cons
 
 void OSCController::handleSystemMotorRotateMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts) {
 	string address = msg.getAddress();
-	// Expected: /system/motor/rotate/{angle_degrees}/{speed?}/{acceleration?}
-	// addressParts[0]=system, [1]=motor, [2]=rotate, [3]=angle, [4]=speed(opt), [5]=accel(opt)
-	if (addressParts.size() < 4) { // Need at least angle
-		sendError(address, "Incomplete system motor rotate command. Expected /system/motor/rotate/{angle}/{speed?}/{accel?}");
+	if (addressParts.size() < 4) {
+		sendError(address, "Incomplete system motor rotate. Expected /system/motor/rotate/{angle}/{speed?}/{accel?}");
 		return;
 	}
-
 	try {
 		float degrees = std::stof(addressParts[3]);
+		std::optional<int> speed_opt = (addressParts.size() > 4) ? std::optional<int>(std::stoi(addressParts[4])) : std::nullopt;
+		std::optional<int> accel_opt = (addressParts.size() > 5) ? std::optional<int>(std::stoi(addressParts[5])) : std::nullopt;
 
+		ofLogNotice("OSCController") << "🔄 OSC: System motor rotate " << degrees << "° applying to ALL HGs.";
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg && hg->isConnected() && hg->getMotor()) {
-				int speed_val = (addressParts.size() > 4) ? std::stoi(addressParts[4]) : hg->motorSpeed.get();
-				int accel_val = (addressParts.size() > 5) ? std::stoi(addressParts[5]) : hg->motorAcceleration.get();
-
-				if (!OSCHelper::isValidAngle(degrees) || !OSCHelper::isValidMotorSpeed(speed_val) || !OSCHelper::isValidMotorAcceleration(accel_val)) {
-					OSCHelper::logError("system_motor_rotate", address, "Skipping HG " + ofToString(i + 1) + ": Invalid rotate params. Angle:" + ofToString(degrees) + " Speed:" + ofToString(speed_val) + " Accel:" + ofToString(accel_val));
-					continue;
-				}
-				hg->getMotor()->moveRelativeAngle(speed_val, accel_val, degrees, hg->gearRatio.get(), hg->calibrationFactor.get());
+			if (hg && hg->isConnected()) { // Check isConnected before commanding a move
+				// Here, we use the provided speed/accel if available, otherwise HourGlass::applyMotorParameters will use its own defaults
+				hg->commandRelativeAngle(degrees, speed_opt, accel_opt);
 			}
 		}
 	} catch (const std::exception & e) {
@@ -906,27 +829,20 @@ void OSCController::handleSystemMotorRotateMessage(ofxOscMessage & msg, const st
 
 void OSCController::handleSystemMotorPositionMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts) {
 	string address = msg.getAddress();
-	// Expected: /system/motor/position/{angle_degrees}/{speed?}/{acceleration?}
-	if (addressParts.size() < 4) { // Need at least angle
-		sendError(address, "Incomplete system motor position command. Expected /system/motor/position/{angle}/{speed?}/{accel?}");
+	if (addressParts.size() < 4) {
+		sendError(address, "Incomplete system motor position. Expected /system/motor/position/{angle}/{speed?}/{accel?}");
 		return;
 	}
-
 	try {
 		float degrees = std::stof(addressParts[3]);
-		ofLogNotice("OSCController") << "🎯 OSC: System motor position to " << degrees << "° applying to ALL HGs.";
+		std::optional<int> speed_opt = (addressParts.size() > 4) ? std::optional<int>(std::stoi(addressParts[4])) : std::nullopt;
+		std::optional<int> accel_opt = (addressParts.size() > 5) ? std::optional<int>(std::stoi(addressParts[5])) : std::nullopt;
 
+		ofLogNotice("OSCController") << "🎯 OSC: System motor position to " << degrees << "° applying to ALL HGs.";
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg && hg->isConnected() && hg->getMotor()) {
-				int speed_val = (addressParts.size() > 4) ? std::stoi(addressParts[4]) : hg->motorSpeed.get();
-				int accel_val = (addressParts.size() > 5) ? std::stoi(addressParts[5]) : hg->motorAcceleration.get();
-
-				if (!OSCHelper::isValidAngle(degrees) || !OSCHelper::isValidMotorSpeed(speed_val) || !OSCHelper::isValidMotorAcceleration(accel_val)) {
-					OSCHelper::logError("system_motor_position", address, "Skipping HG " + ofToString(i + 1) + ": Invalid position params. Angle:" + ofToString(degrees) + " Speed:" + ofToString(speed_val) + " Accel:" + ofToString(accel_val));
-					continue;
-				}
-				hg->getMotor()->moveAbsoluteAngle(speed_val, accel_val, degrees, hg->gearRatio.get(), hg->calibrationFactor.get());
+			if (hg && hg->isConnected()) { // Check isConnected
+				hg->commandAbsoluteAngle(degrees, speed_opt, accel_opt);
 			}
 		}
 	} catch (const std::exception & e) {
@@ -935,10 +851,24 @@ void OSCController::handleSystemMotorPositionMessage(ofxOscMessage & msg, const 
 }
 
 void OSCController::forceRefreshAllHardwareStates() {
-	for (auto & pair : lastSentValues) {
-		pair.second.initialized = false;
+	ofLogNotice("OSCController") << "Forcing refresh of all hardware states.";
+	for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
+		HourGlass * hg = hourglassManager->getHourGlass(i);
+		if (hg) {
+			LedMagnetController * upMagnet = hg->getUpLedMagnet();
+			if (upMagnet) {
+				upMagnet->rgbInitialized = false;
+				upMagnet->mainLedInitialized = false;
+				upMagnet->pwmInitialized = false;
+			}
+			LedMagnetController * downMagnet = hg->getDownLedMagnet();
+			if (downMagnet) {
+				downMagnet->rgbInitialized = false;
+				downMagnet->mainLedInitialized = false;
+				downMagnet->pwmInitialized = false;
+			}
+		}
 	}
-	// The next call to processLastCommands() will now re-evaluate and send all states.
 }
 
 void OSCController::sendError(const string & originalAddress, const string & errorMessage) {
@@ -967,14 +897,12 @@ int OSCController::extractHourglassId(const vector<string> & addressParts) {
 	}
 }
 
-// New function to extract multiple hourglass IDs
 std::vector<int> OSCController::extractHourglassIds(const vector<string> & addressParts) {
 	std::vector<int> ids;
 	if (addressParts.size() < 2) return ids;
 
 	std::string target = addressParts[1];
 
-	// Handle "all" keyword
 	if (target == "all") {
 		for (int i = 1; i <= (int)hourglassManager->getHourGlassCount(); i++) {
 			ids.push_back(i);
@@ -982,7 +910,6 @@ std::vector<int> OSCController::extractHourglassIds(const vector<string> & addre
 		return ids;
 	}
 
-	// Handle comma-separated list like "1,3,5"
 	size_t commaPos = target.find(',');
 	if (commaPos != std::string::npos) {
 		std::string remaining = target;
@@ -1005,7 +932,6 @@ std::vector<int> OSCController::extractHourglassIds(const vector<string> & addre
 		return ids;
 	}
 
-	// Handle range syntax like "1-3"
 	size_t dashPos = target.find('-');
 	if (dashPos != std::string::npos) {
 		try {
@@ -1022,7 +948,6 @@ std::vector<int> OSCController::extractHourglassIds(const vector<string> & addre
 		return ids;
 	}
 
-	// Handle single ID
 	try {
 		int id = std::stoi(target);
 		if (id >= 1 && id <= (int)hourglassManager->getHourGlassCount()) {
@@ -1035,7 +960,6 @@ std::vector<int> OSCController::extractHourglassIds(const vector<string> & addre
 	return ids;
 }
 
-// Helper function to get multiple hourglasses by IDs
 std::vector<HourGlass *> OSCController::getHourglassesByIds(const std::vector<int> & ids) {
 	std::vector<HourGlass *> hourglasses;
 	for (int id : ids) {
@@ -1077,83 +1001,17 @@ void OSCController::updateUIAngleParameters(float relativeAngle, float absoluteA
 }
 
 void OSCController::processLastCommands() {
-	for (size_t i = 0; i < hourglassManager->getHourGlassCount(); i++) {
-		HourGlass * hg = hourglassManager->getHourGlass(i);
-		if (!hg || !hg->isConnected()) continue;
-		int hourglassId = i + 1;
-		LastSentValues & lastSent = lastSentValues[hourglassId];
+	// The entire loop and logic for sending LED commands based on lastSentValues
+	// and comparing with hg->parameters or uiWrapper->parameters is now handled by
+	// HourGlass::applyLedParameters(), which is called every frame via UIWrapper::update().
 
-		float indivLum = hg->individualLuminosity.get();
+	// Therefore, the LED-related command sending logic in this function should be removed.
 
-		// Determine the correct effect parameters to use
-		int upBlend, upOrigin, upArc;
-		int downBlend, downOrigin, downArc;
+	// If processLastCommands() had other responsibilities (e.g., for motor commands or other state sync)
+	// those would remain. For now, assuming it was primarily for LEDs based on its content.
 
-		if (uiWrapper && hourglassId == (uiWrapper->getCurrentHourGlass() + 1)) {
-			// If this hourglass is active in the UI, use the UI's current slider values
-			upBlend = uiWrapper->upLedBlendParam.get();
-			upOrigin = uiWrapper->upLedOriginParam.get();
-			upArc = uiWrapper->upLedArcParam.get();
-			downBlend = uiWrapper->downLedBlendParam.get();
-			downOrigin = uiWrapper->downLedOriginParam.get();
-			downArc = uiWrapper->downLedArcParam.get();
-		} else {
-			// Otherwise, use the last known sent values for this specific hourglass
-			// These are initialized to defaults (0,0,360) if never changed via UI for this HG
-			upBlend = lastSent.upBlend;
-			upOrigin = lastSent.upOrigin;
-			upArc = lastSent.upArc;
-			downBlend = lastSent.downBlend;
-			downOrigin = lastSent.downOrigin;
-			downArc = lastSent.downArc;
-		}
-
-		ofColor currentUpColor = hg->upLedColor.get();
-		if (!lastSent.initialized || currentUpColor != lastSent.upLedColor || indivLum != lastSent.individualLuminosity || upBlend != lastSent.upBlend || upOrigin != lastSent.upOrigin || upArc != lastSent.upArc) {
-			hg->getUpLedMagnet()->sendLED(currentUpColor.r, currentUpColor.g, currentUpColor.b, upBlend, upOrigin, upArc, indivLum);
-			lastSent.upLedColor = currentUpColor;
-			lastSent.individualLuminosity = indivLum;
-			lastSent.upBlend = upBlend;
-			lastSent.upOrigin = upOrigin;
-			lastSent.upArc = upArc;
-		}
-		ofColor currentDownColor = hg->downLedColor.get();
-		if (!lastSent.initialized || currentDownColor != lastSent.downLedColor || indivLum != lastSent.individualLuminosity || downBlend != lastSent.downBlend || downOrigin != lastSent.downOrigin || downArc != lastSent.downArc) {
-			hg->getDownLedMagnet()->sendLED(currentDownColor.r, currentDownColor.g, currentDownColor.b, downBlend, downOrigin, downArc, indivLum);
-			lastSent.downLedColor = currentDownColor;
-			lastSent.individualLuminosity = indivLum; // Also update for down, in case up wasn't sent
-			lastSent.downBlend = downBlend;
-			lastSent.downOrigin = downOrigin;
-			lastSent.downArc = downArc;
-		}
-
-		int currentUpMainLed = hg->upMainLed.get();
-		if (!lastSent.initialized || currentUpMainLed != lastSent.upMainLed || indivLum != lastSent.individualLuminosity) {
-			hg->getUpLedMagnet()->sendLED(static_cast<uint8_t>(currentUpMainLed), indivLum);
-			lastSent.upMainLed = currentUpMainLed;
-			lastSent.individualLuminosity = indivLum; // Ensure indivLum is stored if only main LED changes
-		}
-		int currentDownMainLed = hg->downMainLed.get();
-		if (!lastSent.initialized || currentDownMainLed != lastSent.downMainLed || indivLum != lastSent.individualLuminosity) {
-			hg->getDownLedMagnet()->sendLED(static_cast<uint8_t>(currentDownMainLed), indivLum);
-			lastSent.downMainLed = currentDownMainLed;
-			lastSent.individualLuminosity = indivLum; // Ensure indivLum is stored
-		}
-
-		// PWM is not affected by luminosity
-		int currentUpPwm = hg->upPwm.get();
-		if (!lastSent.initialized || currentUpPwm != lastSent.upPwm) {
-			hg->getUpLedMagnet()->sendPWM(static_cast<uint8_t>(currentUpPwm));
-			lastSent.upPwm = currentUpPwm;
-		}
-		int currentDownPwm = hg->downPwm.get();
-		if (!lastSent.initialized || currentDownPwm != lastSent.downPwm) {
-			hg->getDownLedMagnet()->sendPWM(static_cast<uint8_t>(currentDownPwm));
-			lastSent.downPwm = currentDownPwm;
-		}
-
-		lastSent.initialized = true;
-	}
+	// If there are no other tasks for processLastCommands, it can be left empty or eventually removed.
+	// For safety, let's leave it empty for now.
 }
 
 void OSCController::loadMotorPresets(const std::string & filename) {

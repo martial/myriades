@@ -11,42 +11,6 @@
 // Forward declaration
 class UIWrapper;
 
-// Structure to track last sent values to hardware for each hourglass
-struct LastSentValues {
-	ofColor upLedColor;
-	ofColor downLedColor;
-	int upPwm;
-	int downPwm;
-	int upMainLed;
-	int downMainLed;
-	float individualLuminosity;
-	// Add effect parameters
-	int upBlend;
-	int upOrigin;
-	int upArc;
-	int downBlend;
-	int downOrigin;
-	int downArc;
-	bool initialized;
-
-	LastSentValues()
-		: upLedColor(0, 0, 0)
-		, downLedColor(0, 0, 0)
-		, upPwm(-1)
-		, downPwm(-1)
-		, upMainLed(-1)
-		, downMainLed(-1)
-		, individualLuminosity(1.0f)
-		// Initialize effect parameters
-		, upBlend(0)
-		, upOrigin(0)
-		, upArc(360)
-		, downBlend(0)
-		, downOrigin(0)
-		, downArc(360)
-		, initialized(false) { }
-};
-
 class OSCController {
 public:
 	OSCController(HourGlassManager * manager);
@@ -99,9 +63,6 @@ private:
 
 	// Connection settings
 	int receivePort;
-
-	// Track last sent values to hardware (indexed by hourglass ID)
-	std::map<int, LastSentValues> lastSentValues;
 
 	// Process last commands in main thread
 	void processLastCommands();

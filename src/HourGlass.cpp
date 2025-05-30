@@ -15,7 +15,15 @@ HourGlass::HourGlass(const std::string & name)
 	, updatingFromOSC(false)
 	, lastLedCommandSendTime(0.0f)
 	, motorAcceleration("motorAcceleration", 128, 0, 255)
-	, individualLuminosity("individualLuminosity", 1.0f, 0.0f, 1.0f) {
+	, individualLuminosity("individualLuminosity", 1.0f, 0.0f, 1.0f)
+	, upLedBlend("upLedBlend", 0, 0, 768)
+	, upLedOrigin("upLedOrigin", 0, 0, 360)
+	, upLedArc("upLedArc", 360, 0, 360)
+	, downLedBlend("downLedBlend", 0, 0, 768)
+	, downLedOrigin("downLedOrigin", 0, 0, 360)
+	, downLedArc("downLedArc", 360, 0, 360)
+	, upEffectsManager()
+	, downEffectsManager() {
 	ofLogNotice("HourGlass") << "🏗️ Constructing HourGlass: " << name;
 
 	// Add parameters to the group
@@ -32,6 +40,12 @@ HourGlass::HourGlass(const std::string & name)
 	params.add(upPwm);
 	params.add(downPwm);
 	params.add(individualLuminosity);
+	params.add(upLedBlend);
+	params.add(upLedOrigin);
+	params.add(upLedArc);
+	params.add(downLedBlend);
+	params.add(downLedOrigin);
+	params.add(downLedArc);
 }
 
 HourGlass::~HourGlass() {
@@ -158,38 +172,163 @@ void HourGlass::setAllLEDs(uint8_t r, uint8_t g, uint8_t b) {
 void HourGlass::applyMotorParameters() {
 	if (!isConnected() || !motor) return;
 
-	motor->setMicrostep(microstep.get());
+	// Apply persistent settings
+	motor->setMicrostep(microstep.get()); // This is fine to call regularly
 
 	if (motorEnabled.get()) {
-		motor->enable();
+		motor->enable(); // Idempotent or controller handles repeated calls
 	} else {
-		motor->disable();
+		motor->disable(); // Idempotent
+	}
+
+	// Determine speed and acceleration to use for pending commands
+	// Use pending values if provided, otherwise fallback to ofParameters
+	int currentSpeed = pendingMoveSpeed.value_or(motorSpeed.get());
+	int currentAccel = pendingMoveAccel.value_or(motorAcceleration.get());
+
+	// Execute pending commands
+	if (executeRelativeMove) {
+		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing relative move: " << targetRelativeSteps;
+		motor->moveRelative(currentSpeed, currentAccel, targetRelativeSteps);
+		executeRelativeMove = false;
+	}
+	if (executeAbsoluteMove) {
+		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing absolute move to: " << targetAbsolutePosition;
+		motor->moveAbsolute(currentSpeed, currentAccel, targetAbsolutePosition);
+		executeAbsoluteMove = false;
+	}
+	if (executeRelativeAngle) {
+		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing relative angle: " << targetRelativeDegrees;
+		motor->moveRelativeAngle(currentSpeed, currentAccel, targetRelativeDegrees, gearRatio.get(), calibrationFactor.get());
+		executeRelativeAngle = false;
+	}
+	if (executeAbsoluteAngle) {
+		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing absolute angle to: " << targetAbsoluteDegrees;
+		motor->moveAbsoluteAngle(currentSpeed, currentAccel, targetAbsoluteDegrees, gearRatio.get(), calibrationFactor.get());
+		executeAbsoluteAngle = false;
+	}
+
+	// Reset pending speed/accel after commands are processed for this frame
+	pendingMoveSpeed = std::nullopt;
+	pendingMoveAccel = std::nullopt;
+}
+
+void HourGlass::updateEffects(float deltaTime) {
+	// ofLogVerbose("HourGlass::updateEffects") << getName() << " - deltaTime: " << deltaTime; // COMMENTED BACK
+	upEffectsManager.update(deltaTime);
+	downEffectsManager.update(deltaTime);
+}
+
+void HourGlass::addUpEffect(std::unique_ptr<Effect> effect) {
+	if (effect) {
+		upEffectsManager.addEffect(std::move(effect));
 	}
 }
 
+void HourGlass::addDownEffect(std::unique_ptr<Effect> effect) {
+	if (effect) {
+		downEffectsManager.addEffect(std::move(effect));
+	}
+}
+
+void HourGlass::clearUpEffects() {
+	upEffectsManager.clearEffects();
+}
+
+void HourGlass::clearDownEffects() {
+	downEffectsManager.clearEffects();
+}
+
+// Modified applyLedParameters
 void HourGlass::applyLedParameters() {
 	if (!connected || !upLedMagnet || !downLedMagnet) return;
 
 	float currentTime = ofGetElapsedTimeMillis();
 	if (currentTime - lastLedCommandSendTime < MIN_LED_COMMAND_INTERVAL_MS) {
+		// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - Throttled"; // Keep this commented
 		return;
 	}
+	// ofLogNotice("HourGlass::applyLedParameters") << getName() << " - Applying LED parameters with effects."; // Keep this one for now, or comment if too noisy
 
-	float indivLum = individualLuminosity.get();
+	float dt = ofGetLastFrameTime();
 
-	ofColor upColor = upLedColor.get();
-	upLedMagnet->sendLED(upColor.r, upColor.g, upColor.b, 0, 0, 360, indivLum); // Default effect parameters
+	// --- UP LED Controller ---
+	EffectParameters upParams;
+	// ... (population of upParams) ...
+	upParams.color = upLedColor.get();
+	upParams.mainLedValue = upMainLed.get();
+	upParams.blend = upLedBlend.get();
+	upParams.origin = upLedOrigin.get();
+	upParams.arc = upLedArc.get();
+	upParams.effectLuminosityMultiplier = 1.0f;
+	upParams.deltaTime = dt;
 
-	ofColor downColor = downLedColor.get();
-	downLedMagnet->sendLED(downColor.r, downColor.g, downColor.b, 0, 0, 360, indivLum); // Default effect parameters
+	// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - UP Before effects - Arc: " << upParams.arc << " LumM: " << upParams.effectLuminosityMultiplier; // COMMENTED BACK
+	upEffectsManager.processEffects(upParams);
+	// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - UP After effects - Arc: " << upParams.arc << " LumM: " << upParams.effectLuminosityMultiplier; // COMMENTED BACK
 
-	upLedMagnet->sendLED(static_cast<uint8_t>(upMainLed.get()), indivLum);
-	downLedMagnet->sendLED(static_cast<uint8_t>(downMainLed.get()), indivLum);
+	float finalUpIndividualLuminosity = individualLuminosity.get() * upParams.effectLuminosityMultiplier;
 
-	upLedMagnet->sendPWM(static_cast<uint8_t>(upPwm.get()));
-	downLedMagnet->sendPWM(static_cast<uint8_t>(downPwm.get()));
+	upLedMagnet->sendLED(upParams.color.r, upParams.color.g, upParams.color.b,
+		upParams.blend, upParams.origin, upParams.arc,
+		finalUpIndividualLuminosity);
+	upLedMagnet->sendLED(static_cast<uint8_t>(upParams.mainLedValue), finalUpIndividualLuminosity);
+	upLedMagnet->sendPWM(static_cast<uint8_t>(upPwm.get())); // upPwm is still direct from ofParameter
+
+	// --- DOWN LED Controller ---
+	EffectParameters downParams;
+	// ... (population of downParams) ...
+	downParams.color = downLedColor.get();
+	downParams.mainLedValue = downMainLed.get();
+	downParams.blend = downLedBlend.get();
+	downParams.origin = downLedOrigin.get();
+	downParams.arc = downLedArc.get();
+	downParams.effectLuminosityMultiplier = 1.0f;
+	downParams.deltaTime = dt;
+
+	// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - DOWN Before effects - Arc: " << downParams.arc << " LumM: " << downParams.effectLuminosityMultiplier; // COMMENTED BACK
+	downEffectsManager.processEffects(downParams);
+	// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - DOWN After effects - Arc: " << downParams.arc << " LumM: " << downParams.effectLuminosityMultiplier; // COMMENTED BACK
+
+	float finalDownIndividualLuminosity = individualLuminosity.get() * downParams.effectLuminosityMultiplier;
+
+	downLedMagnet->sendLED(downParams.color.r, downParams.color.g, downParams.color.b,
+		downParams.blend, downParams.origin, downParams.arc,
+		finalDownIndividualLuminosity);
+	downLedMagnet->sendLED(static_cast<uint8_t>(downParams.mainLedValue), finalDownIndividualLuminosity);
+	downLedMagnet->sendPWM(static_cast<uint8_t>(downPwm.get())); // downPwm is still direct from ofParameter
 
 	lastLedCommandSendTime = currentTime;
+}
 
-	ofLogVerbose("HourGlass") << name << " - Applied LED parameters to hardware with individual luminosity=" << indivLum;
+void HourGlass::commandRelativeMove(int steps, std::optional<int> speed, std::optional<int> accel) {
+	targetRelativeSteps = steps;
+	pendingMoveSpeed = speed;
+	pendingMoveAccel = accel;
+	executeRelativeMove = true;
+	ofLogNotice("HourGlass::command") << getName() << " - Relative move commanded: " << steps << " steps.";
+}
+
+void HourGlass::commandAbsoluteMove(int position, std::optional<int> speed, std::optional<int> accel) {
+	targetAbsolutePosition = position;
+	pendingMoveSpeed = speed;
+	pendingMoveAccel = accel;
+	executeAbsoluteMove = true;
+	ofLogNotice("HourGlass::command") << getName() << " - Absolute move commanded to: " << position;
+}
+
+void HourGlass::commandRelativeAngle(float degrees, std::optional<int> speed, std::optional<int> accel) {
+	targetRelativeDegrees = degrees;
+	pendingMoveSpeed = speed;
+	pendingMoveAccel = accel;
+	executeRelativeAngle = true;
+	ofLogNotice("HourGlass::command") << getName() << " - Relative angle commanded: " << degrees << " deg.";
+}
+
+void HourGlass::commandAbsoluteAngle(float degrees, std::optional<int> speed, std::optional<int> accel) {
+	targetAbsoluteDegrees = degrees;
+	pendingMoveSpeed = speed;
+	pendingMoveAccel = accel;
+	executeAbsoluteAngle = true;
+	ofLogNotice("HourGlass::command") << getName() << " - Absolute angle commanded to: " << degrees << " deg.";
 }

@@ -61,7 +61,13 @@ void LEDVisualizer::draw(float x, float y) {
 	float upY = 60;
 	ofColor upColor = hg->upLedColor.get();
 	int upBlend = 0, upOrigin = 0, upArc = 360;
-	if (uiWrapper) {
+
+	LedMagnetController * upMagnet = hg->getUpLedMagnet();
+	if (upMagnet && upMagnet->isRgbInitialized()) {
+		upBlend = upMagnet->getLastSentBlend();
+		upOrigin = upMagnet->getLastSentOrigin();
+		upArc = upMagnet->getLastSentArc();
+	} else if (uiWrapper) {
 		upBlend = uiWrapper->upLedBlendParam.get();
 		upOrigin = uiWrapper->upLedOriginParam.get();
 		upArc = uiWrapper->upLedArcParam.get();
@@ -73,7 +79,13 @@ void LEDVisualizer::draw(float x, float y) {
 	float downY = 60;
 	ofColor downColor = hg->downLedColor.get();
 	int downBlend = 0, downOrigin = 0, downArc = 360;
-	if (uiWrapper) {
+
+	LedMagnetController * downMagnet = hg->getDownLedMagnet();
+	if (downMagnet && downMagnet->isRgbInitialized()) {
+		downBlend = downMagnet->getLastSentBlend();
+		downOrigin = downMagnet->getLastSentOrigin();
+		downArc = downMagnet->getLastSentArc();
+	} else if (uiWrapper) {
 		downBlend = uiWrapper->downLedBlendParam.get();
 		downOrigin = uiWrapper->downLedOriginParam.get();
 		downArc = uiWrapper->downLedArcParam.get();
@@ -96,31 +108,40 @@ void LEDVisualizer::drawHourGlassControllers(const HourGlassVisualization & hgVi
 	float upX = centerX - 120;
 	float upY = centerY;
 
-	ofColor upColor = hg->upLedColor.get();
-	// Get effect parameters from UIWrapper if available, otherwise use defaults
-	int upBlend = 0, upOrigin = 0, upArc = 360;
-	if (uiWrapper) {
-		upBlend = uiWrapper->upLedBlendParam.get();
-		upOrigin = uiWrapper->upLedOriginParam.get();
-		upArc = uiWrapper->upLedArcParam.get();
+	int upBlendHG = 0, upOriginHG = 0, upArcHG = 360;
+
+	LedMagnetController * upMagnetHG = hg->getUpLedMagnet();
+	if (upMagnetHG && upMagnetHG->isRgbInitialized()) {
+		upBlendHG = upMagnetHG->getLastSentBlend();
+		upOriginHG = upMagnetHG->getLastSentOrigin();
+		upArcHG = upMagnetHG->getLastSentArc();
+	} else if (uiWrapper) {
+		upBlendHG = uiWrapper->upLedBlendParam.get();
+		upOriginHG = uiWrapper->upLedOriginParam.get();
+		upArcHG = uiWrapper->upLedArcParam.get();
 	}
 
-	drawController(upX, upY, CIRCLE_3_RADIUS, upColor, upBlend, upOrigin, upArc,
+	drawController(upX, upY, CIRCLE_3_RADIUS, hg->upLedColor.get(), upBlendHG, upOriginHG, upArcHG,
 		globalLum, individualLum, "UP");
 
 	// Draw DOWN controller (right)
 	float downX = centerX + 120;
 	float downY = centerY;
 
-	ofColor downColor = hg->downLedColor.get();
-	int downBlend = 0, downOrigin = 0, downArc = 360;
-	if (uiWrapper) {
-		downBlend = uiWrapper->downLedBlendParam.get();
-		downOrigin = uiWrapper->downLedOriginParam.get();
-		downArc = uiWrapper->downLedArcParam.get();
+	int downBlendHG = 0, downOriginHG = 0, downArcHG = 360;
+
+	LedMagnetController * downMagnetHG = hg->getDownLedMagnet();
+	if (downMagnetHG && downMagnetHG->isRgbInitialized()) {
+		downBlendHG = downMagnetHG->getLastSentBlend();
+		downOriginHG = downMagnetHG->getLastSentOrigin();
+		downArcHG = downMagnetHG->getLastSentArc();
+	} else if (uiWrapper) {
+		downBlendHG = uiWrapper->downLedBlendParam.get();
+		downOriginHG = uiWrapper->downLedOriginParam.get();
+		downArcHG = uiWrapper->downLedArcParam.get();
 	}
 
-	drawController(downX, downY, CIRCLE_3_RADIUS, downColor, downBlend, downOrigin, downArc,
+	drawController(downX, downY, CIRCLE_3_RADIUS, hg->downLedColor.get(), downBlendHG, downOriginHG, downArcHG,
 		globalLum, individualLum, "DOWN");
 
 	// Draw connection between controllers
@@ -269,23 +290,31 @@ void LEDVisualizer::drawArcIndicators(float centerX, float centerY, float radius
 	ofDrawLine(centerX, centerY, endX, endY);
 }
 
-bool LEDVisualizer::isAngleInArc(float currentAngleDegrees, int startAngleDegrees, int endAngleDegrees) {
+bool LEDVisualizer::isAngleInArc(float currentAngleDegrees, int startAngleDegrees, int arcSpanDegrees) {
 	// Normalize all angles to 0-360 range
 	currentAngleDegrees = normalizeAngle(currentAngleDegrees);
 	startAngleDegrees = normalizeAngle(startAngleDegrees);
-	endAngleDegrees = normalizeAngle(endAngleDegrees);
 
-	// Special case: if start equals end, consider full circle active (or if arc is >= 360 from original params)
-	if (startAngleDegrees == endAngleDegrees) { // This condition covers arc >= 360 implicitly if origin and arc UI params are used to derive these.
+	// Calculate end angle based on origin and span
+	// Ensure arcSpanDegrees is treated correctly, e.g. if it can be > 360 or negative from effect.
+	// For simplicity, let's assume arcSpanDegrees is intended to be 0-360.
+	arcSpanDegrees = std::max(0, std::min(arcSpanDegrees, 360)); // Clamp span to 0-360
+
+	if (arcSpanDegrees == 360) { // Full circle if span is 360
 		return true;
 	}
+	if (arcSpanDegrees == 0) { // Nothing if span is 0
+		return false;
+	}
 
-	if (startAngleDegrees <= endAngleDegrees) {
+	int endAngleDegreesCalculated = normalizeAngle(static_cast<float>(startAngleDegrees) + arcSpanDegrees);
+
+	if (startAngleDegrees <= endAngleDegreesCalculated) {
 		// Arc doesn't cross 0 degrees
-		return currentAngleDegrees >= startAngleDegrees && currentAngleDegrees <= endAngleDegrees;
+		return currentAngleDegrees >= startAngleDegrees && currentAngleDegrees <= endAngleDegreesCalculated;
 	} else {
 		// Arc crosses 0 degrees (e.g., from 350° to 10°)
-		return currentAngleDegrees >= startAngleDegrees || currentAngleDegrees <= endAngleDegrees;
+		return currentAngleDegrees >= startAngleDegrees || currentAngleDegrees <= endAngleDegreesCalculated;
 	}
 }
 

@@ -69,6 +69,18 @@ public:
 	bool isExtended() const { return ext; }
 	bool isRemote() const { return rtr; }
 
+	// Getters for last sent values (for visualization)
+	ofColor getLastSentRGB() const { return lastSentRGB; }
+	uint8_t getLastSentMainLED() const { return lastSentMainLED; }
+	uint8_t getLastSentPWM() const { return lastSentPWM; }
+	int getLastSentBlend() const { return lastSentBlend; }
+	int getLastSentOrigin() const { return lastSentOrigin; }
+	int getLastSentArc() const { return lastSentArc; }
+
+	bool isRgbInitialized() const { return rgbInitialized; }
+	bool isMainLedInitialized() const { return mainLedInitialized; }
+	bool isPwmInitialized() const { return pwmInitialized; }
+
 	// For rate-limiting/logging send frequency
 	float lastSendTime;
 

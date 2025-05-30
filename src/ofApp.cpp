@@ -29,11 +29,17 @@ void ofApp::setup() {
 
 //--------------------------------------------------------------
 void ofApp::update() {
+	ofSetLogLevel(OF_LOG_VERBOSE);
+	// ofLogVerbose("ofApp::update") << "Start of ofApp::update()"; // COMMENTED BACK
+
 	// Update OSC controller (process incoming messages)
 	oscController.update();
 
+	// ofLogVerbose("ofApp::update") << "Calling ui.update()"; // COMMENTED BACK
 	// Update UI
 	ui.update();
+
+	// ofLogVerbose("ofApp::update") << "End of ofApp::update()"; // COMMENTED BACK
 }
 
 //--------------------------------------------------------------

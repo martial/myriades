@@ -96,6 +96,14 @@ private:
 	// Encoder constants from manual
 	static constexpr int ENCODER_COUNTS_PER_REVOLUTION = 0x4000; // 16384 counts = 360 degrees
 
+	// State for preventing redundant commands
+	bool motorEnabledStateInitialized = false;
+	bool lastMotorEnabledState = false;
+	bool microstepInitialized = false;
+	int lastMicrostepValue = 0;
+	// Note: Movement commands are already handled by HourGlass's flag system
+	// to be one-shot, so MotorController doesn't need to cache last move target/speed/accel.
+
 	// Build protocol packet (same as CAN protocol)
 	std::vector<uint8_t> buildPacket(const std::vector<uint8_t> & data) const;
 
