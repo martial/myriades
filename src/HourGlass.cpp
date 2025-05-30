@@ -246,7 +246,7 @@ void HourGlass::applyLedParameters() {
 	float currentTime = ofGetElapsedTimeMillis();
 	if (currentTime - lastLedCommandSendTime < MIN_LED_COMMAND_INTERVAL_MS) {
 		// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - Throttled"; // Keep this commented
-		return;
+		//return;
 	}
 	// ofLogNotice("HourGlass::applyLedParameters") << getName() << " - Applying LED parameters with effects."; // Keep this one for now, or comment if too noisy
 
@@ -269,11 +269,13 @@ void HourGlass::applyLedParameters() {
 
 	float finalUpIndividualLuminosity = individualLuminosity.get() * upParams.effectLuminosityMultiplier;
 
-	upLedMagnet->sendLED(upParams.color.r, upParams.color.g, upParams.color.b,
+	// UNIFIED COMMAND: Send all LED parameters in one consistent format
+	upLedMagnet->sendAllLEDParameters(
+		upParams.color.r, upParams.color.g, upParams.color.b,
 		upParams.blend, upParams.origin, upParams.arc,
+		static_cast<uint8_t>(upParams.mainLedValue),
+		static_cast<uint8_t>(upPwm.get()),
 		finalUpIndividualLuminosity);
-	upLedMagnet->sendLED(static_cast<uint8_t>(upParams.mainLedValue), finalUpIndividualLuminosity);
-	upLedMagnet->sendPWM(static_cast<uint8_t>(upPwm.get())); // upPwm is still direct from ofParameter
 
 	// --- DOWN LED Controller ---
 	EffectParameters downParams;
@@ -292,11 +294,13 @@ void HourGlass::applyLedParameters() {
 
 	float finalDownIndividualLuminosity = individualLuminosity.get() * downParams.effectLuminosityMultiplier;
 
-	downLedMagnet->sendLED(downParams.color.r, downParams.color.g, downParams.color.b,
+	// UNIFIED COMMAND: Send all LED parameters in one consistent format
+	downLedMagnet->sendAllLEDParameters(
+		downParams.color.r, downParams.color.g, downParams.color.b,
 		downParams.blend, downParams.origin, downParams.arc,
+		static_cast<uint8_t>(downParams.mainLedValue),
+		static_cast<uint8_t>(downPwm.get()),
 		finalDownIndividualLuminosity);
-	downLedMagnet->sendLED(static_cast<uint8_t>(downParams.mainLedValue), finalDownIndividualLuminosity);
-	downLedMagnet->sendPWM(static_cast<uint8_t>(downPwm.get())); // downPwm is still direct from ofParameter
 
 	lastLedCommandSendTime = currentTime;
 }

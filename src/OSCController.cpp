@@ -65,31 +65,27 @@ void OSCController::processMessage(ofxOscMessage & message) {
 		if (addressParts.size() >= 2 && (addressParts[1] == "connect" || addressParts[1] == "disconnect" || addressParts[1] == "status")) {
 			handleConnectionMessage(message);
 		} else if (addressParts.size() >= 3) {
-			try {
-				std::stoi(addressParts[1]); // Validate ID
-				if (addressParts[2] == "motor") {
-					handleMotorMessage(message);
-				} else if (addressParts[2] == "led" || addressParts[2] == "pwm" || addressParts[2] == "dotstar" || addressParts[2] == "main" || addressParts[2] == "up" || addressParts[2] == "down") {
-					handleLedMessage(message);
-				} else if (addressParts[2] == "connect" || addressParts[2] == "disconnect" || addressParts[2] == "status") {
-					handleConnectionMessage(message);
-				} else if (addressParts[2] == "blackout") {
-					// Treat /hourglass/{id}/blackout as setting individual luminosity to 0
-					ofxOscMessage lumMsg; // Create a new message to pass to luminosity handler
-					lumMsg.setAddress(message.getAddress()); // Keep original address for logging context if needed
-					lumMsg.addFloatArg(0.0f); // Add 0.0f as the luminosity value
-					handleIndividualLuminosityMessage(lumMsg);
-				} else if (addressParts[2] == "luminosity") {
-					handleIndividualLuminosityMessage(message);
-				} else if (addressParts[2] == "motor" && addressParts.size() >= 4 && addressParts[3] == "preset") {
-					handleMotorPresetMessage(message);
-				} else if (addressParts[2] == "motor" && addressParts.size() >= 6 && addressParts[3] == "config") {
-					handleIndividualMotorConfigMessage(message, addressParts);
-				} else {
-					sendError(address, "Unknown hourglass command or motor subcommand: " + addressParts[2] + (addressParts.size() >= 4 ? "/" + addressParts[3] : ""));
-				}
-			} catch (const std::exception &) {
-				sendError(address, "Invalid hourglass ID: " + addressParts[1]);
+			// Route to handlers based on command type - let each handler validate IDs
+			if (addressParts[2] == "motor") {
+				handleMotorMessage(message);
+			} else if (addressParts[2] == "led" || addressParts[2] == "pwm" || addressParts[2] == "dotstar" || addressParts[2] == "main" || addressParts[2] == "up" || addressParts[2] == "down") {
+				handleLedMessage(message);
+			} else if (addressParts[2] == "connect" || addressParts[2] == "disconnect" || addressParts[2] == "status") {
+				handleConnectionMessage(message);
+			} else if (addressParts[2] == "blackout") {
+				// Treat /hourglass/{id}/blackout as setting individual luminosity to 0
+				ofxOscMessage lumMsg; // Create a new message to pass to luminosity handler
+				lumMsg.setAddress(message.getAddress()); // Keep original address for logging context if needed
+				lumMsg.addFloatArg(0.0f); // Add 0.0f as the luminosity value
+				handleIndividualLuminosityMessage(lumMsg);
+			} else if (addressParts[2] == "luminosity") {
+				handleIndividualLuminosityMessage(message);
+			} else if (addressParts[2] == "motor" && addressParts.size() >= 4 && addressParts[3] == "preset") {
+				handleMotorPresetMessage(message);
+			} else if (addressParts[2] == "motor" && addressParts.size() >= 6 && addressParts[3] == "config") {
+				handleIndividualMotorConfigMessage(message, addressParts);
+			} else {
+				sendError(address, "Unknown hourglass command or motor subcommand: " + addressParts[2] + (addressParts.size() >= 4 ? "/" + addressParts[3] : ""));
 			}
 		} else {
 			sendError(address, "Incomplete hourglass address");
@@ -165,6 +161,13 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		sendError(address, "Incomplete motor command");
 		return;
 	}
+
+	// Motor commands don't support "all" syntax - validate single ID
+	if (addressParts[1] == "all") {
+		sendError(address, "Motor commands don't support 'all' syntax. Use individual hourglass IDs or system commands.");
+		return;
+	}
+
 	int hourglassId = extractHourglassId(addressParts);
 	if (!isValidHourglassId(hourglassId)) {
 		sendError(address, "Invalid hourglass ID: " + addressParts[1]);
@@ -400,6 +403,12 @@ void OSCController::handleIndividualLedMessageForHourglass(ofxOscMessage & msg, 
 			return;
 		}
 
+		if (target == "up") {
+			hg->upLedBlend.set(blend);
+		} else {
+			hg->downLedBlend.set(blend);
+		}
+
 		if (shouldUpdateUI) {
 			if (target == "up") {
 				uiWrapper->updateUpLedBlendFromOSC(blend);
@@ -419,6 +428,12 @@ void OSCController::handleIndividualLedMessageForHourglass(ofxOscMessage & msg, 
 			return;
 		}
 
+		if (target == "up") {
+			hg->upLedOrigin.set(origin);
+		} else {
+			hg->downLedOrigin.set(origin);
+		}
+
 		if (shouldUpdateUI) {
 			if (target == "up") {
 				uiWrapper->updateUpLedOriginFromOSC(origin);
@@ -436,6 +451,12 @@ void OSCController::handleIndividualLedMessageForHourglass(ofxOscMessage & msg, 
 			sendError(address, "Invalid arc value (0-360)");
 			hg->updatingFromOSC = false;
 			return;
+		}
+
+		if (target == "up") {
+			hg->upLedArc.set(arc);
+		} else {
+			hg->downLedArc.set(arc);
 		}
 
 		if (shouldUpdateUI) {
@@ -488,6 +509,11 @@ void OSCController::handleAllLedMessageForHourglass(ofxOscMessage & msg, HourGla
 				hg->updatingFromOSC = false;
 				return;
 			}
+
+			// CRITICAL FIX: Update HourGlass parameters so hardware gets updated
+			hg->upLedBlend.set(blend);
+			hg->downLedBlend.set(blend);
+
 			if (shouldUpdateUI) {
 				uiWrapper->updateUpLedBlendFromOSC(blend);
 				uiWrapper->updateDownLedBlendFromOSC(blend);
@@ -503,6 +529,11 @@ void OSCController::handleAllLedMessageForHourglass(ofxOscMessage & msg, HourGla
 				hg->updatingFromOSC = false;
 				return;
 			}
+
+			// CRITICAL FIX: Update HourGlass parameters so hardware gets updated
+			hg->upLedOrigin.set(origin);
+			hg->downLedOrigin.set(origin);
+
 			if (shouldUpdateUI) {
 				uiWrapper->updateUpLedOriginFromOSC(origin);
 				uiWrapper->updateDownLedOriginFromOSC(origin);
@@ -518,6 +549,11 @@ void OSCController::handleAllLedMessageForHourglass(ofxOscMessage & msg, HourGla
 				hg->updatingFromOSC = false;
 				return;
 			}
+
+			// CRITICAL FIX: Update HourGlass parameters so hardware gets updated
+			hg->upLedArc.set(arc);
+			hg->downLedArc.set(arc);
+
 			if (shouldUpdateUI) {
 				uiWrapper->updateUpLedArcFromOSC(arc);
 				uiWrapper->updateDownLedArcFromOSC(arc);
@@ -637,6 +673,31 @@ void OSCController::handleIndividualLuminosityMessage(ofxOscMessage & msg) {
 		return;
 	}
 
+	if (!OSCHelper::validateParameters(msg, 1, "individual_luminosity")) return;
+	float luminosityValue = OSCHelper::getArgument<float>(msg, 0, 1.0f);
+	luminosityValue = OSCHelper::clamp(luminosityValue, 0.0f, 1.0f);
+
+	// Handle "all" syntax for individual luminosity
+	if (addressParts[1] == "all") {
+		ofLogNotice("OSCController") << "💡 OSC: Setting individual luminosity to " << luminosityValue << " for ALL hourglasses";
+
+		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); i++) {
+			HourGlass * hg = hourglassManager->getHourGlass(i);
+			if (hg) {
+				hg->individualLuminosity.set(luminosityValue);
+			}
+		}
+
+		// Update UI if current hourglass is being affected
+		if (uiWrapper) {
+			uiWrapper->updateCurrentIndividualLuminositySlider(luminosityValue);
+		}
+
+		forceRefreshAllHardwareStates();
+		return;
+	}
+
+	// Handle individual hourglass
 	int hourglassId = extractHourglassId(addressParts);
 	if (!isValidHourglassId(hourglassId)) {
 		OSCHelper::logError("IndividualLuminosity", address, "Invalid hourglass ID: " + addressParts[1]);
@@ -648,10 +709,6 @@ void OSCController::handleIndividualLuminosityMessage(ofxOscMessage & msg) {
 		OSCHelper::logError("IndividualLuminosity", address, "Hourglass not found: " + addressParts[1]);
 		return;
 	}
-
-	if (!OSCHelper::validateParameters(msg, 1, "individual_luminosity")) return;
-	float luminosityValue = OSCHelper::getArgument<float>(msg, 0, 1.0f);
-	luminosityValue = OSCHelper::clamp(luminosityValue, 0.0f, 1.0f);
 
 	hg->individualLuminosity.set(luminosityValue);
 
@@ -851,7 +908,7 @@ void OSCController::handleSystemMotorPositionMessage(ofxOscMessage & msg, const 
 }
 
 void OSCController::forceRefreshAllHardwareStates() {
-	ofLogNotice("OSCController") << "Forcing refresh of all hardware states.";
+	ofLogNotice("OSCController") << "Forcing refresh of all hardware states (excluding PWM).";
 	for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 		HourGlass * hg = hourglassManager->getHourGlass(i);
 		if (hg) {
@@ -859,13 +916,13 @@ void OSCController::forceRefreshAllHardwareStates() {
 			if (upMagnet) {
 				upMagnet->rgbInitialized = false;
 				upMagnet->mainLedInitialized = false;
-				upMagnet->pwmInitialized = false;
+				// upMagnet->pwmInitialized = false; // PWM is not affected by global luminosity, so don't force resend unless its value actually changed.
 			}
 			LedMagnetController * downMagnet = hg->getDownLedMagnet();
 			if (downMagnet) {
 				downMagnet->rgbInitialized = false;
 				downMagnet->mainLedInitialized = false;
-				downMagnet->pwmInitialized = false;
+				// downMagnet->pwmInitialized = false; // PWM is not affected by global luminosity
 			}
 		}
 	}

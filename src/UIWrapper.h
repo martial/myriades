@@ -191,4 +191,8 @@ private:
 
 	ofxButton addCosineArcEffectBtn;
 	ofxButton clearAllEffectsBtn;
+
+	// NEW METHODS: Fix for hourglass selection bug
+	void updateUIPanelsBinding();
+	void updateListenersForCurrentHourglass();
 };

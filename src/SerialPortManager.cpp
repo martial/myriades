@@ -82,20 +82,24 @@ SerialPortManager & SerialPortManager::getInstance() {
 std::shared_ptr<ISerialPort> SerialPortManager::getPort(const std::string & portName, int baudRate) {
 	std::lock_guard<std::mutex> lock(portsMutex);
 
+	ofLogNotice("SerialPortManager") << "🔍 Port request: " << portName << " @ " << baudRate << " baud";
+
 	// Check if port is already active
 	auto it = activePorts.find(portName);
 	if (it != activePorts.end()) {
 		auto existingPort = it->second.lock();
 		if (existingPort) {
-			// ofLogNotice("SerialPortManager") << "Reusing existing connection to: " << portName;
+			ofLogNotice("SerialPortManager") << "✅ Reusing existing connection to: " << portName;
 			return existingPort;
 		} else {
 			// Weak pointer expired, remove it
 			activePorts.erase(it);
+			ofLogWarning("SerialPortManager") << "⚠️  Cleaned up expired connection to: " << portName;
 		}
 	}
 
 	// Create new port connection
+	ofLogNotice("SerialPortManager") << "🔌 Creating NEW connection to: " << portName;
 	auto newPort = std::make_shared<OfSerialPort>();
 
 	// Find device index by name

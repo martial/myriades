@@ -161,6 +161,7 @@ LedMagnetController & LedMagnetController::sendLED(uint8_t r, uint8_t g, uint8_t
 	uint8_t byte4 = bitsMap & 0xFF;
 
 	// Send 8-byte command: command(3), r, g, b, byte1, byte2, byte3, byte4
+
 	send({ 3, finalR, finalG, finalB, byte1, byte2, byte3, byte4 });
 
 	// Store last sent values
@@ -231,13 +232,13 @@ bool LedMagnetController::send(const std::vector<uint8_t> & data) {
 
 	std::vector<uint8_t> packet = buildPacket(data);
 
-	// Log the complete frame being sent
-	// std::string frameLog = "frame: ";
-	// for (size_t i = 0; i < packet.size(); i++) {
-	// 	if (i > 0) frameLog += " ";
-	// 	frameLog += std::to_string(static_cast<int>(packet[i]));
-	// }
-	// ofLogNotice("SerialFrame") << frameLog;
+	// Log what we're sending including device ID
+	std::string dataStr = "";
+	for (size_t i = 0; i < data.size(); i++) {
+		if (i > 0) dataStr += " ";
+		dataStr += std::to_string(static_cast<int>(data[i]));
+	}
+	ofLogNotice("LedMagnetController") << "Sending to ID " << id << ": [" << dataStr << "]";
 
 	serialPort->writeBytes(packet.data(), packet.size());
 	return true;
@@ -379,4 +380,59 @@ bool LedMagnetController::isArcActive(int currentAngle, int origin, int arcEnd) 
 		// Arc crosses 0 degrees (e.g., from 350° to 10°)
 		return currentAngle >= origin || currentAngle <= arcEnd;
 	}
+}
+
+// Unified LED command - sends all parameters in one consistent format
+LedMagnetController & LedMagnetController::sendAllLEDParameters(
+	uint8_t r, uint8_t g, uint8_t b,
+	int blend, int origin, int arc,
+	uint8_t mainLedValue, uint8_t pwmValue,
+	float individualLuminosityFactor) {
+
+	// Pre-check each parameter type to avoid unnecessary calls
+
+	// 1. Check if RGB/arc/blend/origin parameters changed
+	uint8_t optR = optimizeRGB(r);
+	uint8_t optG = optimizeRGB(g);
+	uint8_t optB = optimizeRGB(b);
+	uint8_t finalR = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(optR) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
+	uint8_t finalG = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(optG) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
+	uint8_t finalB = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(optB) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
+	int clampedBlend = OSCHelper::clamp(blend, 0, 768);
+	int clampedOrigin = OSCHelper::clamp(origin, 0, 360);
+	int clampedArc = OSCHelper::clamp(arc, 0, 360);
+	ofColor currentColor(finalR, finalG, finalB);
+
+	bool rgbNeedsUpdate = !rgbInitialized || !(currentColor == lastSentRGB && clampedBlend == lastSentBlend && clampedOrigin == lastSentOrigin && clampedArc == lastSentArc);
+
+	// 2. Check if Main LED value changed
+	uint8_t finalMainLed = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(mainLedValue) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
+	bool mainLedNeedsUpdate = !mainLedInitialized || (finalMainLed != lastSentMainLED);
+
+	// 3. Check if PWM value changed
+	bool pwmNeedsUpdate = !pwmInitialized || (pwmValue != lastSentPWM);
+
+	// ONLY send commands for parameters that actually changed
+	if (rgbNeedsUpdate) {
+		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending RGB command (changed)";
+		sendLED(r, g, b, blend, origin, arc, individualLuminosityFactor, true);
+	} else {
+		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping RGB command (same values)";
+	}
+
+	if (mainLedNeedsUpdate) {
+		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending Main LED command (changed)";
+		sendLED(mainLedValue, individualLuminosityFactor);
+	} else {
+		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping Main LED command (same value)";
+	}
+
+	if (pwmNeedsUpdate) {
+		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending PWM command (changed)";
+		sendPWM(pwmValue);
+	} else {
+		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping PWM command (same value)";
+	}
+
+	return *this;
 }

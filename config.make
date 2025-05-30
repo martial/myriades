@@ -8,7 +8,7 @@
 #   The location of your root openFrameworks installation
 #       (default) OF_ROOT = ../../.. 
 ################################################################################
-OF_ROOT = ../../..
+# OF_ROOT = ../../..
 
 ################################################################################
 # PROJECT ROOT
@@ -78,6 +78,12 @@ OF_ROOT = ../../..
 # incorporated directly into the final executable application binary.
 # TODO: should this be a default setting?
 # PROJECT_LDFLAGS=-Wl,-rpath=./libs
+# PROJECT_LDFLAGS += -arch x86_64 -arch arm64
+# If you need the rpath setting and it's not handled by the core OF makefiles,
+# you might uncomment and combine like so:
+# PROJECT_LDFLAGS = -Wl,-rpath=./libs -arch x86_64 -arch arm64
+# Or, if PROJECT_LDFLAGS might already have a value from core makefiles:
+# PROJECT_LDFLAGS += -Wl,-rpath=./libs # (if not already set as default)
 
 ################################################################################
 # PROJECT DEFINES
@@ -106,6 +112,8 @@ OF_ROOT = ../../..
 #   Note: Leave a leading space when adding list items with the += operator
 ################################################################################
 # PROJECT_CFLAGS = 
+# PROJECT_CFLAGS += -arch x86_64 -arch arm64
+# The -arch flags are typically handled by PLATFORM_ARCHS below
 
 ################################################################################
 # PROJECT OPTIMIZATION CFLAGS
@@ -144,5 +152,12 @@ OF_ROOT = ../../..
 # osx template
 
 # Uncomment/comment below to switch between C++11 and C++17 ( or newer ). On macOS C++17 needs 10.15 or above.
-# export MAC_OS_MIN_VERSION = 10.15
+export MAC_OS_MIN_VERSION = 10.15
+# export MAC_OS_CPP_VER = -std=c++17
+
+# Define the target architectures for a universal binary.
+# The OpenFrameworks core makefiles should use this variable.
+PLATFORM_ARCHS = -arch x86_64 -arch arm64
+
+# Uncomment if you want to force C++17 (ensure MAC_OS_MIN_VERSION is compatible)
 # export MAC_OS_CPP_VER = -std=c++17

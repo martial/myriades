@@ -54,6 +54,9 @@ void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl) {
 	// Load saved settings and configurations
 	loadSettings();
 
+	// CRITICAL FIX: Set up initial UI panel bindings for the first hourglass
+	updateUIPanelsBinding();
+
 	ofLogNotice("UIWrapper") << "Setup complete with " << hourglassManager->getHourGlassCount() << " hourglasses";
 }
 
@@ -168,29 +171,10 @@ void UIWrapper::setupPanels() {
 	moveRelativeAngleBtnParam.set("Move Relative Angle");
 	moveAbsoluteAngleBtnParam.set("Move Absolute Angle");
 
-	// Add shared parameters from first hourglass
-	if (hourglassManager->getHourGlassCount() > 0) {
-		auto * hg = hourglassManager->getHourGlass(0);
-		if (hg) {
-			motorPanel.add(hg->motorEnabled);
-			motorPanel.add(hg->microstep);
-			motorPanel.add(hg->motorSpeed);
-			motorPanel.add(hg->motorAcceleration);
-
-			gearRatioInput.setup(hg->gearRatio);
-			calibrationFactorInput.setup(hg->calibrationFactor);
-			motorPanel.add(&gearRatioInput);
-			motorPanel.add(&calibrationFactorInput);
-		}
-	}
-
-	motorPanel.add(relativePositionParam);
-	motorPanel.add(absolutePositionParam);
+	// NOTE: Motor panel contents will be populated by updateUIPanelsBinding()
 
 	relativeAngleInput.setup(relativeAngleParam);
 	absoluteAngleInput.setup(absoluteAngleParam);
-	motorPanel.add(&relativeAngleInput);
-	motorPanel.add(&absoluteAngleInput);
 
 	emergencyStopBtn.setup(emergencyStopBtnParam.getName());
 	setZeroBtn.setup(setZeroBtnParam.getName());
@@ -198,12 +182,6 @@ void UIWrapper::setupPanels() {
 	moveAbsoluteBtn.setup(moveAbsoluteBtnParam.getName());
 	moveRelativeAngleBtn.setup(moveRelativeAngleBtnParam.getName());
 	moveAbsoluteAngleBtn.setup(moveAbsoluteAngleBtnParam.getName());
-	motorPanel.add(&emergencyStopBtn);
-	motorPanel.add(&setZeroBtn);
-	motorPanel.add(&moveRelativeBtn);
-	motorPanel.add(&moveAbsoluteBtn);
-	motorPanel.add(&moveRelativeAngleBtn);
-	motorPanel.add(&moveAbsoluteAngleBtn);
 
 	// === PANEL 3: UP LED CONTROLLER (Center) ===
 	ledUpPanel.setup("UP LED CONTROLLER", "led_up.xml", startX + (panelWidth + panelSpacing) * 2, startY);
@@ -212,26 +190,12 @@ void UIWrapper::setupPanels() {
 	ledUpPanel.setDefaultHeaderBackgroundColor(ofColor(40, 40, 40, 200));
 	ledUpPanel.setDefaultTextColor(ofColor(255, 255, 255));
 
-	// Up LED Controller - RGB + Main LED + PWM
-	if (hourglassManager->getHourGlassCount() > 0) {
-		auto * hg = hourglassManager->getHourGlass(0);
-		if (hg) {
-			ledUpPanel.add(hg->upLedColor.set("RGB Color", ofColor::black));
-			ledUpPanel.add(hg->upMainLed.set("Main LED", 0, 0, 255));
-			ledUpPanel.add(hg->upPwm.set("PWM", 0, 0, 255));
-		}
-	}
+	// NOTE: LED panel contents will be populated by updateUIPanelsBinding()
 
 	// Up LED Effect Parameters
 	upLedBlendParam.set("Blend", 0, 0, 768);
 	upLedOriginParam.set("Origin (°)", 0, 0, 360);
 	upLedArcParam.set("Arc (°)", 360, 0, 360);
-	ledUpPanel.add(upLedBlendParam);
-	ledUpPanel.add(upLedOriginParam);
-	ledUpPanel.add(upLedArcParam);
-
-	// Expand color picker by default
-	ledUpPanel.getGroup("RGB Color").maximize();
 
 	// === PANEL 4: DOWN LED CONTROLLER (Center-Right) ===
 	ledDownPanel.setup("DOWN LED CONTROLLER", "led_down.xml", startX + (panelWidth + panelSpacing) * 3, startY);
@@ -240,26 +204,12 @@ void UIWrapper::setupPanels() {
 	ledDownPanel.setDefaultHeaderBackgroundColor(ofColor(40, 40, 40, 200));
 	ledDownPanel.setDefaultTextColor(ofColor(255, 255, 255));
 
-	// Down LED Controller - RGB + Main LED + PWM
-	if (hourglassManager->getHourGlassCount() > 0) {
-		auto * hg = hourglassManager->getHourGlass(0);
-		if (hg) {
-			ledDownPanel.add(hg->downLedColor.set("RGB Color", ofColor::black));
-			ledDownPanel.add(hg->downMainLed.set("Main LED", 0, 0, 255));
-			ledDownPanel.add(hg->downPwm.set("PWM", 0, 0, 255));
-		}
-	}
+	// NOTE: LED panel contents will be populated by updateUIPanelsBinding()
 
 	// Down LED Effect Parameters
 	downLedBlendParam.set("Blend", 0, 0, 768);
 	downLedOriginParam.set("Origin (°)", 0, 0, 360);
 	downLedArcParam.set("Arc (°)", 360, 0, 360);
-	ledDownPanel.add(downLedBlendParam);
-	ledDownPanel.add(downLedOriginParam);
-	ledDownPanel.add(downLedArcParam);
-
-	// Expand color picker by default
-	ledDownPanel.getGroup("RGB Color").maximize();
 
 	// === PANEL 5: MODULE LUMINOSITY (Right) ===
 	luminosityPanel.setup("MODULE LUMINOSITY", "luminosity.xml", startX + (panelWidth + panelSpacing) * 4, startY);
@@ -330,34 +280,17 @@ void UIWrapper::setupListeners() {
 
 	// Setup OSC parameter sync for the first hourglass
 	if (hourglassManager->getHourGlassCount() > 0) {
-		auto * hg = hourglassManager->getHourGlass(0);
-		if (hg) {
-			// Disable ofxOscParameterSync for now, use OSCController for everything
-			// oscSync.setup(hg->getParameterGroup(), 9000, "localhost", 9001);
-			ofLogNotice("UIWrapper") << "Using OSCController only - all OSC on port 8000";
+		// Disable ofxOscParameterSync for now, use OSCController for everything
+		// oscSync.setup(hg->getParameterGroup(), 9000, "localhost", 9001);
+		ofLogNotice("UIWrapper") << "Using OSCController only - all OSC on port 8000";
 
-			// Log simple OSC addresses for RGB control
-			ofLogNotice("OSC Addresses") << "RGB Color control addresses (port 8000):";
-			ofLogNotice("OSC Addresses") << "  /rgb [r] [g] [b]           - Set both LEDs";
-			ofLogNotice("OSC Addresses") << "  /up/rgb [r] [g] [b]        - Set upper LED";
-			ofLogNotice("OSC Addresses") << "  /down/rgb [r] [g] [b]      - Set lower LED";
+		// Log simple OSC addresses for RGB control
+		ofLogNotice("OSC Addresses") << "RGB Color control addresses (port 8000):";
+		ofLogNotice("OSC Addresses") << "  /rgb [r] [g] [b]           - Set both LEDs";
+		ofLogNotice("OSC Addresses") << "  /up/rgb [r] [g] [b]        - Set upper LED";
+		ofLogNotice("OSC Addresses") << "  /down/rgb [r] [g] [b]      - Set lower LED";
 
-			// Add listeners for motor parameters to apply changes to hardware
-			hg->motorEnabled.addListener(this, &UIWrapper::onMotorEnabledChanged);
-			hg->microstep.addListener(this, &UIWrapper::onMicrostepChanged);
-			hg->motorSpeed.addListener(this, &UIWrapper::onMotorSpeedChanged);
-			hg->motorAcceleration.addListener(this, &UIWrapper::onMotorAccelerationChanged);
-			hg->gearRatio.addListener(this, &UIWrapper::onGearRatioChanged);
-			hg->calibrationFactor.addListener(this, &UIWrapper::onCalibrationFactorChanged);
-
-			// Add listeners for LED parameters to apply changes to hardware
-			hg->upLedColor.addListener(this, &UIWrapper::onUpLedColorChanged);
-			hg->downLedColor.addListener(this, &UIWrapper::onDownLedColorChanged);
-			hg->upMainLed.addListener(this, &UIWrapper::onUpMainLedChanged);
-			hg->downMainLed.addListener(this, &UIWrapper::onDownMainLedChanged);
-			hg->upPwm.addListener(this, &UIWrapper::onUpPwmChanged);
-			hg->downPwm.addListener(this, &UIWrapper::onDownPwmChanged);
-		}
+		// NOTE: Parameter listeners will be set up by updateListenersForCurrentHourglass()
 	}
 
 	// Quick action listeners
@@ -650,11 +583,105 @@ void UIWrapper::hourglassSelectorChanged(int & selection) {
 		currentHgIndividualLuminosityParam.removeListener(this, &UIWrapper::onIndividualLuminosityChanged);
 		currentHgIndividualLuminosityParam.set(hg->individualLuminosity.get());
 		currentHgIndividualLuminosityParam.addListener(this, &UIWrapper::onIndividualLuminosityChanged);
+
+		// CRITICAL FIX: Update UI panels to bind to the newly selected hourglass
+		updateUIPanelsBinding();
 	} else {
 		// Optionally disable or set to a default if no valid HG is selected
 		currentHgIndividualLuminosityParam.removeListener(this, &UIWrapper::onIndividualLuminosityChanged);
 		currentHgIndividualLuminosityParam.set(1.0f); // Default to full if HG invalid
 		currentHgIndividualLuminosityParam.addListener(this, &UIWrapper::onIndividualLuminosityChanged);
+	}
+}
+
+void UIWrapper::updateUIPanelsBinding() {
+	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (!hg) return;
+
+	// Clear and rebuild LED panels with correct hourglass bindings
+	ledUpPanel.clear();
+	ledDownPanel.clear();
+	motorPanel.clear();
+
+	// === UP LED PANEL ===
+	ledUpPanel.add(hg->upLedColor.set("RGB Color", hg->upLedColor.get()));
+	ledUpPanel.add(hg->upMainLed.set("Main LED", hg->upMainLed.get(), 0, 255));
+	ledUpPanel.add(hg->upPwm.set("PWM", hg->upPwm.get(), 0, 255));
+	ledUpPanel.add(upLedBlendParam);
+	ledUpPanel.add(upLedOriginParam);
+	ledUpPanel.add(upLedArcParam);
+	ledUpPanel.getGroup("RGB Color").maximize();
+
+	// === DOWN LED PANEL ===
+	ledDownPanel.add(hg->downLedColor.set("RGB Color", hg->downLedColor.get()));
+	ledDownPanel.add(hg->downMainLed.set("Main LED", hg->downMainLed.get(), 0, 255));
+	ledDownPanel.add(hg->downPwm.set("PWM", hg->downPwm.get(), 0, 255));
+	ledDownPanel.add(downLedBlendParam);
+	ledDownPanel.add(downLedOriginParam);
+	ledDownPanel.add(downLedArcParam);
+	ledDownPanel.getGroup("RGB Color").maximize();
+
+	// === MOTOR PANEL ===
+	motorPanel.add(hg->motorEnabled);
+	motorPanel.add(hg->microstep);
+	motorPanel.add(hg->motorSpeed);
+	motorPanel.add(hg->motorAcceleration);
+	gearRatioInput.setup(hg->gearRatio);
+	calibrationFactorInput.setup(hg->calibrationFactor);
+	motorPanel.add(&gearRatioInput);
+	motorPanel.add(&calibrationFactorInput);
+	motorPanel.add(relativePositionParam);
+	motorPanel.add(absolutePositionParam);
+	motorPanel.add(&relativeAngleInput);
+	motorPanel.add(&absoluteAngleInput);
+	motorPanel.add(&emergencyStopBtn);
+	motorPanel.add(&setZeroBtn);
+	motorPanel.add(&moveRelativeBtn);
+	motorPanel.add(&moveAbsoluteBtn);
+	motorPanel.add(&moveRelativeAngleBtn);
+	motorPanel.add(&moveAbsoluteAngleBtn);
+
+	// Update listeners for the newly selected hourglass
+	updateListenersForCurrentHourglass();
+
+	ofLogNotice("UIWrapper") << "UI panels rebound to HourGlass " << (currentHourGlass + 1) << ": " << hg->getName();
+}
+
+void UIWrapper::updateListenersForCurrentHourglass() {
+	// Remove old listeners from ALL hourglasses first
+	for (int i = 0; i < hourglassManager->getHourGlassCount(); i++) {
+		auto * hg = hourglassManager->getHourGlass(i);
+		if (hg) {
+			hg->motorEnabled.removeListener(this, &UIWrapper::onMotorEnabledChanged);
+			hg->microstep.removeListener(this, &UIWrapper::onMicrostepChanged);
+			hg->motorSpeed.removeListener(this, &UIWrapper::onMotorSpeedChanged);
+			hg->motorAcceleration.removeListener(this, &UIWrapper::onMotorAccelerationChanged);
+			hg->gearRatio.removeListener(this, &UIWrapper::onGearRatioChanged);
+			hg->calibrationFactor.removeListener(this, &UIWrapper::onCalibrationFactorChanged);
+			hg->upLedColor.removeListener(this, &UIWrapper::onUpLedColorChanged);
+			hg->downLedColor.removeListener(this, &UIWrapper::onDownLedColorChanged);
+			hg->upMainLed.removeListener(this, &UIWrapper::onUpMainLedChanged);
+			hg->downMainLed.removeListener(this, &UIWrapper::onDownMainLedChanged);
+			hg->upPwm.removeListener(this, &UIWrapper::onUpPwmChanged);
+			hg->downPwm.removeListener(this, &UIWrapper::onDownPwmChanged);
+		}
+	}
+
+	// Add listeners to the currently selected hourglass
+	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (hg) {
+		hg->motorEnabled.addListener(this, &UIWrapper::onMotorEnabledChanged);
+		hg->microstep.addListener(this, &UIWrapper::onMicrostepChanged);
+		hg->motorSpeed.addListener(this, &UIWrapper::onMotorSpeedChanged);
+		hg->motorAcceleration.addListener(this, &UIWrapper::onMotorAccelerationChanged);
+		hg->gearRatio.addListener(this, &UIWrapper::onGearRatioChanged);
+		hg->calibrationFactor.addListener(this, &UIWrapper::onCalibrationFactorChanged);
+		hg->upLedColor.addListener(this, &UIWrapper::onUpLedColorChanged);
+		hg->downLedColor.addListener(this, &UIWrapper::onDownLedColorChanged);
+		hg->upMainLed.addListener(this, &UIWrapper::onUpMainLedChanged);
+		hg->downMainLed.addListener(this, &UIWrapper::onDownMainLedChanged);
+		hg->upPwm.addListener(this, &UIWrapper::onUpPwmChanged);
+		hg->downPwm.addListener(this, &UIWrapper::onDownPwmChanged);
 	}
 }
 
@@ -916,72 +943,238 @@ void UIWrapper::notifyOSCMessageReceived() {
 
 // XML save/load for persistence
 void UIWrapper::saveSettings() {
-	// Save all panel settings to their respective XML files
-	settingsPanel.saveToFile("settings_actions.xml");
-	motorPanel.saveToFile("motor.xml");
-	ledUpPanel.saveToFile("led_up.xml");
-	ledDownPanel.saveToFile("led_down.xml");
-	luminosityPanel.saveToFile("luminosity.xml");
+	ofLogNotice("UIWrapper") << "💾 Saving settings for all hourglasses...";
 
-	// Save HourGlass configurations (device IDs, ports, etc.)
-	ofXml hourglassConfig;
-	auto configurationsNode = hourglassConfig.appendChild("HourGlassConfigurations");
+	// === Save UI State (current selection, global settings) ===
+	ofXml uiStateConfig;
+	auto uiStateNode = uiStateConfig.appendChild("UIState");
+
+	// Save current hourglass selection
+	uiStateNode.setAttribute("currentHourGlass", ofToString(currentHourGlass));
+	uiStateNode.setAttribute("globalLuminosity", ofToString(LedMagnetController::getGlobalLuminosity()));
+	uiStateNode.setAttribute("syncColors", syncColorsParam.get() ? "true" : "false");
+
+	uiStateConfig.save("ui_state.xml");
+
+	// === Save Per-HourGlass Settings ===
+	ofXml hourglassSettingsConfig;
+	auto hourglassesNode = hourglassSettingsConfig.appendChild("HourGlassSettings");
 
 	for (size_t i = 0; i < hourglassManager->getHourGlassCount(); i++) {
 		auto * hg = hourglassManager->getHourGlass(i);
 		if (hg) {
-			auto hgNode = configurationsNode.appendChild("HourGlass");
+			auto hgNode = hourglassesNode.appendChild("HourGlass");
+			hgNode.setAttribute("index", ofToString(i));
 			hgNode.setAttribute("name", hg->getName());
-			hgNode.setAttribute("serialPort", hg->getSerialPort());
-			hgNode.setAttribute("baudRate", ofToString(hg->getBaudRate()));
-			hgNode.setAttribute("upLedId", ofToString(hg->getUpLedId()));
-			hgNode.setAttribute("downLedId", ofToString(hg->getDownLedId()));
-			hgNode.setAttribute("motorId", ofToString(hg->getMotorId()));
-		}
-	}
 
-	hourglassConfig.save("hourglass_config.xml");
+			// === Hardware Configuration ===
+			auto hardwareNode = hgNode.appendChild("Hardware");
+			hardwareNode.setAttribute("serialPort", hg->getSerialPort());
+			hardwareNode.setAttribute("baudRate", ofToString(hg->getBaudRate()));
+			hardwareNode.setAttribute("upLedId", ofToString(hg->getUpLedId()));
+			hardwareNode.setAttribute("downLedId", ofToString(hg->getDownLedId()));
+			hardwareNode.setAttribute("motorId", ofToString(hg->getMotorId()));
 
-	ofLogNotice("UIWrapper") << "💾 Settings and HourGlass configurations saved to XML files";
-}
+			// === LED Settings ===
+			auto ledsNode = hgNode.appendChild("LEDs");
+			auto upColor = hg->upLedColor.get();
+			auto downColor = hg->downLedColor.get();
 
-void UIWrapper::loadSettings() {
-	// Load all panel settings from their respective XML files
-	settingsPanel.loadFromFile("settings_actions.xml");
-	motorPanel.loadFromFile("motor.xml");
-	ledUpPanel.loadFromFile("led_up.xml");
-	ledDownPanel.loadFromFile("led_down.xml");
-	luminosityPanel.loadFromFile("luminosity.xml");
+			ledsNode.setAttribute("upColorR", ofToString(upColor.r));
+			ledsNode.setAttribute("upColorG", ofToString(upColor.g));
+			ledsNode.setAttribute("upColorB", ofToString(upColor.b));
+			ledsNode.setAttribute("upMainLed", ofToString(hg->upMainLed.get()));
+			ledsNode.setAttribute("upPwm", ofToString(hg->upPwm.get()));
+			ledsNode.setAttribute("upBlend", ofToString(hg->upLedBlend.get()));
+			ledsNode.setAttribute("upOrigin", ofToString(hg->upLedOrigin.get()));
+			ledsNode.setAttribute("upArc", ofToString(hg->upLedArc.get()));
 
-	// Load HourGlass configurations (device IDs, ports, etc.)
-	ofXml hourglassConfig;
-	if (hourglassConfig.load("hourglass_config.xml")) {
-		auto configurationsNode = hourglassConfig.findFirst("HourGlassConfigurations");
-		if (configurationsNode) {
-			auto hourglassNodes = configurationsNode.getChildren("HourGlass");
+			ledsNode.setAttribute("downColorR", ofToString(downColor.r));
+			ledsNode.setAttribute("downColorG", ofToString(downColor.g));
+			ledsNode.setAttribute("downColorB", ofToString(downColor.b));
+			ledsNode.setAttribute("downMainLed", ofToString(hg->downMainLed.get()));
+			ledsNode.setAttribute("downPwm", ofToString(hg->downPwm.get()));
+			ledsNode.setAttribute("downBlend", ofToString(hg->downLedBlend.get()));
+			ledsNode.setAttribute("downOrigin", ofToString(hg->downLedOrigin.get()));
+			ledsNode.setAttribute("downArc", ofToString(hg->downLedArc.get()));
 
-			// Iterate over hourglass nodes
-			size_t i = 0;
-			for (auto & node : hourglassNodes) {
-				if (i >= hourglassManager->getHourGlassCount()) break;
+			ledsNode.setAttribute("individualLuminosity", ofToString(hg->individualLuminosity.get()));
 
-				auto * hg = hourglassManager->getHourGlass(i);
-				if (hg) {
-					std::string serialPort = node.getAttribute("serialPort").getValue();
-					int baudRate = ofToInt(node.getAttribute("baudRate").getValue());
-					int upLedId = ofToInt(node.getAttribute("upLedId").getValue());
-					int downLedId = ofToInt(node.getAttribute("downLedId").getValue());
-					int motorId = ofToInt(node.getAttribute("motorId").getValue());
+			// === Motor Settings ===
+			auto motorNode = hgNode.appendChild("Motor");
+			motorNode.setAttribute("enabled", hg->motorEnabled.get() ? "true" : "false");
+			motorNode.setAttribute("microstep", ofToString(hg->microstep.get()));
+			motorNode.setAttribute("speed", ofToString(hg->motorSpeed.get()));
+			motorNode.setAttribute("acceleration", ofToString(hg->motorAcceleration.get()));
+			motorNode.setAttribute("gearRatio", ofToString(hg->gearRatio.get(), 6)); // 6 decimal precision for float
+			motorNode.setAttribute("calibrationFactor", ofToString(hg->calibrationFactor.get(), 6)); // 6 decimal precision for float
 
-					// Reconfigure the HourGlass with saved settings
-					hg->configure(serialPort, baudRate, upLedId, downLedId, motorId);
-				}
-				i++;
+			// === UI Parameters (position values, etc.) ===
+			auto uiNode = hgNode.appendChild("UIParams");
+			// Only save these for the currently selected hourglass to avoid confusion
+			if (i == currentHourGlass) {
+				uiNode.setAttribute("relativePosition", ofToString(relativePositionParam.get()));
+				uiNode.setAttribute("absolutePosition", ofToString(absolutePositionParam.get()));
+				uiNode.setAttribute("relativeAngle", ofToString(relativeAngleParam.get()));
+				uiNode.setAttribute("absoluteAngle", ofToString(absoluteAngleParam.get()));
 			}
 		}
 	}
 
-	ofLogNotice("UIWrapper") << "📂 Settings and HourGlass configurations loaded from XML files";
+	hourglassSettingsConfig.save("hourglass_settings.xml");
+
+	// Also save the legacy panel files for backup compatibility
+	settingsPanel.saveToFile("settings_actions.xml");
+	luminosityPanel.saveToFile("luminosity.xml");
+	effectsPanel.saveToFile("effects.xml");
+
+	ofLogNotice("UIWrapper") << "💾 Settings saved: " << hourglassManager->getHourGlassCount() << " hourglasses, current selection: " << (currentHourGlass + 1);
+}
+
+void UIWrapper::loadSettings() {
+	ofLogNotice("UIWrapper") << "📂 Loading settings for all hourglasses...";
+
+	// === Load UI State (selection, global settings) ===
+	ofXml uiStateConfig;
+	if (uiStateConfig.load("ui_state.xml")) {
+		auto uiStateNode = uiStateConfig.findFirst("UIState");
+		if (uiStateNode) {
+			// Restore global settings first
+			float globalLum = ofToFloat(uiStateNode.getAttribute("globalLuminosity").getValue());
+			if (globalLum > 0) {
+				LedMagnetController::setGlobalLuminosity(globalLum);
+				updateGlobalLuminositySlider(globalLum);
+			}
+
+			bool syncColors = (uiStateNode.getAttribute("syncColors").getValue() == "true");
+			syncColorsParam.removeListener(this, &UIWrapper::syncColorsChanged);
+			syncColorsParam.set(syncColors);
+			syncColorsParam.addListener(this, &UIWrapper::syncColorsChanged);
+
+			// Restore hourglass selection
+			int savedSelection = ofToInt(uiStateNode.getAttribute("currentHourGlass").getValue());
+			if (savedSelection >= 0 && savedSelection < hourglassManager->getHourGlassCount()) {
+				currentHourGlass = savedSelection;
+				hourglassSelectorParam.removeListener(this, &UIWrapper::hourglassSelectorChanged);
+				hourglassSelectorParam.set(currentHourGlass + 1);
+				hourglassSelectorParam.addListener(this, &UIWrapper::hourglassSelectorChanged);
+				ofLogNotice("UIWrapper") << "📂 Restored hourglass selection: " << (currentHourGlass + 1);
+			}
+		}
+	}
+
+	// === Load Per-HourGlass Settings ===
+	ofXml hourglassSettingsConfig;
+	if (hourglassSettingsConfig.load("hourglass_settings.xml")) {
+		auto hourglassesNode = hourglassSettingsConfig.findFirst("HourGlassSettings");
+		if (hourglassesNode) {
+			auto hourglassNodes = hourglassesNode.getChildren("HourGlass");
+
+			for (auto & node : hourglassNodes) {
+				int index = ofToInt(node.getAttribute("index").getValue());
+				if (index >= 0 && index < hourglassManager->getHourGlassCount()) {
+					auto * hg = hourglassManager->getHourGlass(index);
+					if (hg) {
+						// === Load Hardware Configuration ===
+						auto hardwareNode = node.findFirst("Hardware");
+						if (hardwareNode) {
+							std::string serialPort = hardwareNode.getAttribute("serialPort").getValue();
+							int baudRate = ofToInt(hardwareNode.getAttribute("baudRate").getValue());
+							int upLedId = ofToInt(hardwareNode.getAttribute("upLedId").getValue());
+							int downLedId = ofToInt(hardwareNode.getAttribute("downLedId").getValue());
+							int motorId = ofToInt(hardwareNode.getAttribute("motorId").getValue());
+
+							// Reconfigure the HourGlass with saved settings
+							if (!serialPort.empty() && baudRate > 0) {
+								hg->configure(serialPort, baudRate, upLedId, downLedId, motorId);
+							}
+						}
+
+						// === Load LED Settings ===
+						auto ledsNode = node.findFirst("LEDs");
+						if (ledsNode) {
+							// Temporarily disable OSC updates while loading
+							hg->updatingFromOSC = true;
+
+							// Up LED settings
+							int upR = ofToInt(ledsNode.getAttribute("upColorR").getValue());
+							int upG = ofToInt(ledsNode.getAttribute("upColorG").getValue());
+							int upB = ofToInt(ledsNode.getAttribute("upColorB").getValue());
+							hg->upLedColor.set(ofColor(upR, upG, upB));
+							hg->upMainLed.set(ofToInt(ledsNode.getAttribute("upMainLed").getValue()));
+							hg->upPwm.set(ofToInt(ledsNode.getAttribute("upPwm").getValue()));
+							hg->upLedBlend.set(ofToInt(ledsNode.getAttribute("upBlend").getValue()));
+							hg->upLedOrigin.set(ofToInt(ledsNode.getAttribute("upOrigin").getValue()));
+							hg->upLedArc.set(ofToInt(ledsNode.getAttribute("upArc").getValue()));
+
+							// Down LED settings
+							int downR = ofToInt(ledsNode.getAttribute("downColorR").getValue());
+							int downG = ofToInt(ledsNode.getAttribute("downColorG").getValue());
+							int downB = ofToInt(ledsNode.getAttribute("downColorB").getValue());
+							hg->downLedColor.set(ofColor(downR, downG, downB));
+							hg->downMainLed.set(ofToInt(ledsNode.getAttribute("downMainLed").getValue()));
+							hg->downPwm.set(ofToInt(ledsNode.getAttribute("downPwm").getValue()));
+							hg->downLedBlend.set(ofToInt(ledsNode.getAttribute("downBlend").getValue()));
+							hg->downLedOrigin.set(ofToInt(ledsNode.getAttribute("downOrigin").getValue()));
+							hg->downLedArc.set(ofToInt(ledsNode.getAttribute("downArc").getValue()));
+
+							// Individual luminosity
+							float indivLum = ofToFloat(ledsNode.getAttribute("individualLuminosity").getValue());
+							if (indivLum > 0) {
+								hg->individualLuminosity.set(indivLum);
+							}
+
+							hg->updatingFromOSC = false;
+						}
+
+						// === Load Motor Settings ===
+						auto motorNode = node.findFirst("Motor");
+						if (motorNode) {
+							hg->updatingFromOSC = true;
+
+							hg->motorEnabled.set(motorNode.getAttribute("enabled").getValue() == "true");
+							hg->microstep.set(ofToInt(motorNode.getAttribute("microstep").getValue()));
+							hg->motorSpeed.set(ofToInt(motorNode.getAttribute("speed").getValue()));
+							hg->motorAcceleration.set(ofToInt(motorNode.getAttribute("acceleration").getValue()));
+							hg->gearRatio.set(ofToFloat(motorNode.getAttribute("gearRatio").getValue()));
+							hg->calibrationFactor.set(ofToFloat(motorNode.getAttribute("calibrationFactor").getValue()));
+
+							hg->updatingFromOSC = false;
+						}
+
+						// === Load UI Parameters (only for current selection) ===
+						if (index == currentHourGlass) {
+							auto uiNode = node.findFirst("UIParams");
+							if (uiNode) {
+								relativePositionParam.set(ofToInt(uiNode.getAttribute("relativePosition").getValue()));
+								absolutePositionParam.set(ofToInt(uiNode.getAttribute("absolutePosition").getValue()));
+								relativeAngleParam.set(ofToInt(uiNode.getAttribute("relativeAngle").getValue()));
+								absoluteAngleParam.set(ofToInt(uiNode.getAttribute("absoluteAngle").getValue()));
+							}
+						}
+
+						ofLogNotice("UIWrapper") << "📂 Loaded settings for HG " << (index + 1) << ": " << hg->getName();
+					}
+				}
+			}
+		}
+	}
+
+	// Load legacy panel files for any remaining UI elements
+	settingsPanel.loadFromFile("settings_actions.xml");
+	luminosityPanel.loadFromFile("luminosity.xml");
+	effectsPanel.loadFromFile("effects.xml");
+
+	// CRITICAL: Update UI panels to show the loaded hourglass settings
+	updateUIPanelsBinding();
+
+	// Update individual luminosity slider to reflect current hourglass
+	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (hg) {
+		updateCurrentIndividualLuminositySlider(hg->individualLuminosity.get());
+	}
+
+	ofLogNotice("UIWrapper") << "📂 Settings loaded for " << hourglassManager->getHourGlassCount() << " hourglasses, current selection: " << (currentHourGlass + 1);
 }
 
 // Implement the new listener method

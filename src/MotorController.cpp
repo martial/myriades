@@ -86,12 +86,15 @@ MotorController & MotorController::setRemote(bool remote) {
 
 // Motor control functions
 MotorController & MotorController::enable(bool enabled_command) {
+
+	/*
 	if (motorEnabledStateInitialized && enabled_command == lastMotorEnabledState) {
 		return *this; // No change, don't send
 	}
 	send({ static_cast<uint8_t>(MotorCommand::ENABLE), enabled_command ? uint8_t(1) : uint8_t(0) });
 	lastMotorEnabledState = enabled_command;
 	motorEnabledStateInitialized = true;
+	*/
 	return *this;
 }
 
@@ -221,6 +224,14 @@ bool MotorController::send(const std::vector<uint8_t> & data) {
 	}
 
 	std::vector<uint8_t> packet = buildPacket(data);
+
+	// Log what we're sending including motor device ID
+	std::string dataStr = "";
+	for (size_t i = 0; i < data.size(); i++) {
+		if (i > 0) dataStr += " ";
+		dataStr += std::to_string(static_cast<int>(data[i]));
+	}
+	ofLogNotice("MotorController") << "Sending to Motor ID " << id << ": [" << dataStr << "]";
 
 	// Send entire packet at once instead of byte-by-byte for better performance
 	serialPort->writeBytes(packet.data(), packet.size());
