@@ -241,6 +241,10 @@ bool LedMagnetController::send(const std::vector<uint8_t> & data) {
 	ofLogNotice("LedMagnetController") << "Sending to ID " << id << ": [" << dataStr << "]";
 
 	serialPort->writeBytes(packet.data(), packet.size());
+
+	// Notify SerialPortManager for statistics
+	SerialPortManager::getInstance().trackWrite(packet.size()); // Use existing trackWrite method
+
 	return true;
 }
 

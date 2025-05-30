@@ -236,6 +236,9 @@ bool MotorController::send(const std::vector<uint8_t> & data) {
 	// Send entire packet at once instead of byte-by-byte for better performance
 	serialPort->writeBytes(packet.data(), packet.size());
 
+	// Notify SerialPortManager for statistics
+	SerialPortManager::getInstance().trackWrite(packet.size()); // Use existing trackWrite method
+
 // Log the sent packet (only in debug mode to reduce overhead)
 #ifdef DEBUG
 	std::string hexStr = "Motor sent: ";
