@@ -38,6 +38,7 @@ public:
 	void enableMotor();
 	void disableMotor();
 	void emergencyStop();
+	void setMotorZero();
 	void setAllLEDs(uint8_t r, uint8_t g, uint8_t b);
 
 	// Parameter-driven methods for OSC/GUI sync

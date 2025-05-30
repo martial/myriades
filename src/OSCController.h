@@ -81,6 +81,7 @@ private:
 	void handleIndividualMotorConfigMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
 	void handleSystemMotorRotateMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
 	void handleSystemMotorPositionMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
+	void handleSystemSetZeroAllMessage(ofxOscMessage & msg); // New handler for setting zero on all motors
 
 	// New feature handlers (ensure this block and its contents are preserved)
 	void handlePWMMessage(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts);

@@ -336,3 +336,10 @@ void HourGlass::commandAbsoluteAngle(float degrees, std::optional<int> speed, st
 	executeAbsoluteAngle = true;
 	ofLogNotice("HourGlass::command") << getName() << " - Absolute angle commanded to: " << degrees << " deg.";
 }
+
+void HourGlass::setMotorZero() {
+	if (isConnected() && motor) {
+		motor->setZero();
+		ofLogNotice("HourGlass") << name << " - Motor zero set";
+	}
+}

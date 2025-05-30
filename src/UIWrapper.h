@@ -98,12 +98,14 @@ private:
 	ofParameter<bool> syncColorsParam;
 	ofParameter<void> allOffBtnParam;
 	ofParameter<void> ledsOffBtnParam;
+	ofParameter<void> setZeroAllBtnParam; // New param for Set Zero All
 	ofParameter<int> downPwm;
 
 	// Direct UI elements (Buttons, Text Inputs)
 	ofxButton connectBtn, disconnectBtn;
 	ofxButton emergencyStopBtn, setZeroBtn, moveRelativeBtn, moveAbsoluteBtn, moveRelativeAngleBtn, moveAbsoluteAngleBtn;
 	ofxButton allOffBtn, ledsOffBtn;
+	ofxButton setZeroAllBtn; // New button for Set Zero All
 	ofxIntField relativeAngleInput, absoluteAngleInput; // Text input for precise angle control
 	ofxFloatField gearRatioInput, calibrationFactorInput; // Text input for precise calibration control
 
@@ -137,6 +139,7 @@ private:
 	void syncColorsChanged(bool & enabled);
 	void onAllOffPressed();
 	void onLedsOffPressed();
+	void onSetZeroAllPressed(); // Declaration for the new handler
 
 	// Motor parameter listeners
 	void onMotorEnabledChanged(bool & enabled);

@@ -106,6 +106,8 @@ void OSCController::processMessage(ofxOscMessage & message) {
 				handleSystemMotorRotateMessage(message, addressParts);
 			} else if (addressParts.size() >= 4 && addressParts[1] == "motor" && addressParts[2] == "position") {
 				handleSystemMotorPositionMessage(message, addressParts);
+			} else if (addressParts.size() >= 3 && addressParts[1] == "motor" && addressParts[2] == "set_zero_all") {
+				handleSystemSetZeroAllMessage(message);
 			} else {
 				sendError(address, "Unknown system command: " + addressParts[1] + (addressParts.size() >= 3 ? "/" + addressParts[2] : ""));
 			}
@@ -194,6 +196,7 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		ofLogNotice("OSCController") << "🚨 OSC: Emergency stop for hourglass " << hourglassId;
 	} else if (command == "set_zero") {
 		motor->setZero();
+		hg->setMotorZero();
 		ofLogNotice("OSCController") << "🎯 OSC: Set zero for hourglass " << hourglassId;
 	} else if (command == "microstep") {
 		if (!OSCHelper::validateParameters(msg, 1, "motor_microstep")) return;
@@ -904,6 +907,16 @@ void OSCController::handleSystemMotorPositionMessage(ofxOscMessage & msg, const 
 		}
 	} catch (const std::exception & e) {
 		sendError(address, "Invalid number format for system motor position parameters: " + std::string(e.what()));
+	}
+}
+
+void OSCController::handleSystemSetZeroAllMessage(ofxOscMessage & msg) {
+	ofLogNotice("OSCController") << "🎯 OSC: Set Zero ALL Motors command received";
+	for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
+		HourGlass * hg = hourglassManager->getHourGlass(i);
+		if (hg && hg->isConnected()) {
+			hg->setMotorZero();
+		}
 	}
 }
 

@@ -151,6 +151,11 @@ void UIWrapper::setupPanels() {
 	settingsPanel.add(&allOffBtn);
 	settingsPanel.add(&ledsOffBtn);
 
+	// New addition: Set Zero ALL Motors button
+	setZeroAllBtnParam.set("Set Zero ALL Motors");
+	setZeroAllBtn.setup(setZeroAllBtnParam.getName());
+	settingsPanel.add(&setZeroAllBtn);
+
 	// === PANEL 2: MOTOR (Center-Left) ===
 	motorPanel.setup("MOTOR", "motor.xml", startX + (panelWidth + panelSpacing) * 1, startY);
 	motorPanel.setDefaultBackgroundColor(ofColor(20, 20, 20, 180));
@@ -303,6 +308,9 @@ void UIWrapper::setupListeners() {
 	// Effects Listeners
 	addCosineArcEffectBtn.addListener(this, &UIWrapper::onAddCosineArcEffectPressed);
 	clearAllEffectsBtn.addListener(this, &UIWrapper::onClearAllEffectsPressed);
+
+	// New addition: Set Zero ALL Motors button listener
+	setZeroAllBtn.addListener(this, &UIWrapper::onSetZeroAllPressed);
 }
 
 void UIWrapper::drawStatus() {
@@ -310,225 +318,169 @@ void UIWrapper::drawStatus() {
 	int panelWidth = 225;
 	int panelSpacing = 15;
 	int startX = 15;
-	int statusY = 420; // Moved down from 390 to use more bottom space
-	int statusWidth = (panelWidth * 5) + (panelSpacing * 4); // Span all 5 panels
+	int statusY = 420;
+	int statusWidth = (panelWidth * 5) + (panelSpacing * 4);
 
 	// Split into two sections: left for HG info, right for serial stats
-	int leftSectionWidth = statusWidth * 0.65; // 65% for HG info
-	int rightSectionWidth = statusWidth * 0.35; // 35% for serial stats
+	int leftSectionWidth = statusWidth * 0.65;
+	int rightSectionWidth = statusWidth * 0.35;
 
 	int textX = startX + 15;
 	int rightTextX = startX + leftSectionWidth + 20;
-	int textY = statusY + 25;
-	int rightTextY = statusY + 25;
-	int lineHeight = 18; // Slightly reduced for more compact layout
+	int initialStatusContentY = statusY + 25; // Base Y for content within the status box, below its top padding
+	int lineHeight = 18;
 
-	// Calculate content height dynamically
-	int leftContentLines = 10; // HG status (5) + keyboard shortcuts (5) - increased to fit content
-	int rightContentLines = 9; // Serial stats (8) + OSC activity (1) - increased to fit content
+	// Calculate content height dynamically based on what we're keeping
+	// Left: Title(1.5), HG Name(1), Port(1), Status(1), Motor(1), Space(1), Separator(0.5), Shortcuts Title(1.5), Shortcuts(3 lines max)
+	// Total approx = 1.5+4+1+0.5+1.5+3 = 11.5 lines
+	int leftContentLines = 12;
+	// Right: Title(1), Bandwidth Bar(takes space of ~1 line text), Instant Label(1)+Data(1), 1s Avg Label(1)+Data(1), Total Label(1)+Data(2), Separator(0.5), OSC Label(1)
+	// Total approx = 1+1+2+2+3+0.5+1 = 10.5 lines (but bar is wider)
+	int rightContentLines = 11;
 	int maxContentLines = std::max(leftContentLines, rightContentLines);
-	int statusHeight = 35 + (maxContentLines * lineHeight * 2); // Increased padding from 25 to 35
+	int statusHeight = 15 + (maxContentLines * lineHeight) + 80; // Top/bottom padding for content area
 
-	// Draw panel background - sized to fit content
-	ofSetColor(40, 40, 45, 180); // Dark semi-transparent
+	ofSetColor(40, 40, 45, 180);
 	ofDrawRectRounded(startX, statusY, statusWidth - startX, statusHeight, 6);
 
-	// Draw vertical separator between sections
-
-	statusY += 50;
 	ofSetColor(60, 60, 60);
 	ofDrawLine(startX + leftSectionWidth + 10, statusY + 10, startX + leftSectionWidth + 10, statusY + statusHeight - 10);
 
 	// === LEFT SECTION: HOURGLASS STATUS ===
-	ofSetColor(255); // White text
-	ofDrawBitmapString("HOURGLASS STATUS", textX, textY);
-	textY += lineHeight * 1.2;
+	int currentLeftY = initialStatusContentY;
+	ofSetColor(255);
+	ofDrawBitmapString("HOURGLASS STATUS", textX, currentLeftY);
+	currentLeftY += lineHeight * 1.5; // Space after title
 
-	// Current HourGlass Info
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg) {
-		ofSetColor(220, 220, 220); // Light gray for info text
-		ofDrawBitmapString("HG " + ofToString(currentHourGlass + 1) + ": " + hg->getName(), textX, textY += lineHeight);
-		ofDrawBitmapString(std::string("Port: ") + (hg->isConnected() ? hg->getSerialPort() : "N/A"), textX, textY += lineHeight);
-		ofDrawBitmapString(std::string("Status: ") + (hg->isConnected() ? "Connected" : "Disconnected"), textX, textY += lineHeight);
+		ofSetColor(220, 220, 220);
+		ofDrawBitmapString("HG " + ofToString(currentHourGlass + 1) + ": " + hg->getName(), textX, currentLeftY);
+		currentLeftY += lineHeight;
+		ofDrawBitmapString(std::string("Port: ") + (hg->isConnected() ? hg->getSerialPort() : "N/A"), textX, currentLeftY);
+		currentLeftY += lineHeight;
+		ofDrawBitmapString(std::string("Status: ") + (hg->isConnected() ? "Connected" : "Disconnected"), textX, currentLeftY);
+		currentLeftY += lineHeight;
 		ofSetColor(hg->motorEnabled.get() ? ofColor::green : ofColor::red);
-		ofDrawBitmapString(std::string("Motor: ") + (hg->motorEnabled.get() ? "Enabled" : "Disabled"), textX, textY += lineHeight);
-
-		// Display LED colors and luminosity info in columns
-		ofColor upColor = hg->upLedColor.get();
-		ofColor downColor = hg->downLedColor.get();
-
-		// Left column - Up LED
-		ofSetColor(220, 220, 220);
-		ofDrawBitmapString("Up RGB: ", textX, textY += lineHeight);
-		ofSetColor(upColor);
-		ofDrawRectangle(textX + 70, textY - lineHeight * 0.7, 15, 15);
-
-		// Right column - Down LED
-		ofSetColor(220, 220, 220);
-		ofDrawBitmapString("Down RGB: ", textX + 200, textY);
-		ofSetColor(downColor);
-		ofDrawRectangle(textX + 280, textY - lineHeight * 0.7, 15, 15);
-
-		// Next line - Main LEDs
-		ofSetColor(220, 220, 220);
-		ofDrawBitmapString("Up Main: " + ofToString(hg->upMainLed.get()), textX, textY += lineHeight);
-		ofDrawBitmapString("Down Main: " + ofToString(hg->downMainLed.get()), textX + 200, textY);
-
-		// Next line - Luminosity info
-		ofDrawBitmapString("Global Lum: " + ofToString(LedMagnetController::getGlobalLuminosity(), 2), textX, textY += lineHeight);
-		ofDrawBitmapString("Indiv Lum: " + ofToString(hg->individualLuminosity.get(), 2), textX + 200, textY);
-
-		textY += lineHeight; // Extra space before next section
+		ofDrawBitmapString(std::string("Motor: ") + (hg->motorEnabled.get() ? "Enabled" : "Disabled"), textX, currentLeftY);
+		currentLeftY += lineHeight * 1.5; // Extra space after HG info
 	} else {
 		ofSetColor(ofColor::orangeRed);
-		ofDrawBitmapString("No HourGlass selected or available.", textX, textY += lineHeight);
-		textY += lineHeight;
+		ofDrawBitmapString("No HourGlass selected or available.", textX, currentLeftY);
+		currentLeftY += lineHeight * 1.5;
 	}
 
-	// Draw separator
 	ofSetColor(100);
-	ofDrawLine(textX, textY + lineHeight * 0.25, textX + leftSectionWidth - 30, textY + lineHeight * 0.25);
+	ofDrawLine(textX, currentLeftY, textX + leftSectionWidth - 30, currentLeftY); // Separator line
+	currentLeftY += lineHeight * 1.5; // Space after separator
 
-	// Keyboard Shortcuts in left section
 	ofSetColor(220, 220, 220);
-	ofDrawBitmapString("Keyboard Shortcuts:", textX, textY += lineHeight * 1.5);
+	ofDrawBitmapString("Keyboard Shortcuts:", textX, currentLeftY);
+	currentLeftY += lineHeight; // Start shortcuts on the next line
 
-	// 3 columns of shortcuts for the wider left section
-	std::vector<std::string> shortcuts1 = {
-		"1-2: Select HG",
-		"c: Connect",
-		"x: Disconnect",
-		"e: Enable",
-		"q: Disable"
+	// Simplified shortcuts
+	std::vector<std::string> shortcuts = {
+		"1-2: Select HG", "c/x: Connect/Disconnect",
+		"z: Zero Motor", "s: Stop Motor (Emerg.)", // Clarified 's'
+		"Arrows: Rotate Motor", "u/d: Move Steps (Rel)" // Clarified 'u/d'
 	};
-
-	std::vector<std::string> shortcuts2 = {
-		"z: Zero",
-		"s: Stop",
-		"u/d: Up/Down",
-		"<->: ±45°",
-		"^v: ±180°"
-	};
-
-	std::vector<std::string> shortcuts3 = {
-		"r: Red",
-		"g: Green",
-		"b: Blue",
-		"w: White",
-		"o: Off"
-	};
-
-	int shortcutY = textY + lineHeight;
-	for (size_t i = 0; i < std::max({ shortcuts1.size(), shortcuts2.size(), shortcuts3.size() }); i++) {
-		if (i < shortcuts1.size()) ofDrawBitmapString(shortcuts1[i], textX, shortcutY);
-		if (i < shortcuts2.size()) ofDrawBitmapString(shortcuts2[i], textX + 140, shortcutY);
-		if (i < shortcuts3.size()) ofDrawBitmapString(shortcuts3[i], textX + 280, shortcutY);
-		shortcutY += lineHeight;
+	for (const auto & shortcut : shortcuts) {
+		ofDrawBitmapString(shortcut, textX, currentLeftY);
+		currentLeftY += lineHeight;
 	}
 
 	// === RIGHT SECTION: SERIAL STATISTICS ===
-	ofSetColor(255); // White text
-	float titleY = rightTextY; // Capture Y before it's incremented for stats lines
-	ofDrawBitmapString("SERIAL STATISTICS", rightTextX, titleY);
+	int currentRightY = initialStatusContentY;
+	ofSetColor(255);
+	float statsTitleY = currentRightY; // Y for the "SERIAL STATISTICS" title
+	ofDrawBitmapString("SERIAL STATISTICS", rightTextX, statsTitleY);
+	// Bandwidth bar will be positioned relative to statsTitleY and rightTextX
 
 	// --- Bandwidth Usage Indicator ---
 	auto serialStats = SerialPortManager::getInstance().getStats();
-	float baudRateBps = 28800.0f; // 230400 / 8
+	float baudRateBps = 28800.0f;
 	float usagePercentage = 0.0f;
 	if (baudRateBps > 0) {
 		usagePercentage = (serialStats.avgBytesPerSecond_1s / baudRateBps) * 100.0f;
-		usagePercentage = std::max(0.0f, std::min(usagePercentage, 100.0f)); // Clamp to 0-100%
+		usagePercentage = std::max(0.0f, std::min(usagePercentage, 100.0f));
 	}
-
 	ofColor usageBarColor = ofColor::darkGreen;
 	ofColor usageTextColor = ofColor::white;
-
 	if (usagePercentage >= 70.0f) {
 		usageBarColor = ofColor::darkRed;
-		usageTextColor = ofColor(255, 180, 180); // Lighter red for text on dark red
+		usageTextColor = ofColor(255, 180, 180);
 	} else if (usagePercentage >= 30.0f) {
-		usageBarColor = ofColor::darkOrange; // ofColor::orange might be too bright
-		usageTextColor = ofColor::white; // White on orange is usually fine
+		usageBarColor = ofColor::darkOrange;
+		usageTextColor = ofColor::white;
 	}
 
-	// Position and dimensions for the bar
-	int barMaxWidth = 100; // Max width of the bar
-	int barHeight = lineHeight * 0.7f; // Make bar slightly shorter than text line
-	int barX = rightTextX + 140; // Position it to the right of the title text
-	// Align bar's vertical center with the approximate vertical center of the title text
-	// Bitmap string draws from baseline, so textY is baseline. Bar Y is top.
-	// A common heuristic is to shift bar Y up by a bit more than half its height from text baseline.
-	int barY = titleY - barHeight * 0.6f; // Adjust this factor for precise vertical alignment
+	int barMaxWidth = 80; // Slightly narrower bar
+	int barHeight = lineHeight * 0.65f;
+	int barX = ofGetWidth() - barMaxWidth - 60; // Adjusted X to be closer to title
+	// Align bar's top with the title's baseline, then shift up slightly if needed
+	int barY = statsTitleY - barHeight + (lineHeight - barHeight) / 2 - 2; // Fine-tune this offset
 	float currentBarWidth = ofMap(usagePercentage, 0, 100, 0, barMaxWidth, true);
 
-	// Draw background for the bar (e.g., a darker shade)
-	ofSetColor(50, 50, 50); // Dark grey background for the bar
+	ofSetColor(50, 50, 50);
 	ofDrawRectangle(barX, barY, barMaxWidth, barHeight);
-
-	// Draw the usage bar
 	ofSetColor(usageBarColor);
 	ofDrawRectangle(barX, barY, currentBarWidth, barHeight);
-
-	// Draw outline for the bar
 	ofSetColor(80, 80, 80);
 	ofNoFill();
 	ofDrawRectangle(barX, barY, barMaxWidth, barHeight);
 	ofFill();
-
-	// Draw percentage text - aim to vertically center it with the bar
 	ofSetColor(usageTextColor);
 	std::string usageText = ofToString(usagePercentage, 1) + "%";
-	// Adjust Y for text to align its baseline better with the bar's vertical center
-	ofDrawBitmapString(usageText, barX + barMaxWidth + 8, barY + barHeight * 0.8f); // Shifted text slightly right too
+
+	float textBaselineY = barY + barHeight - (barHeight * 0.15f); // e.g., 85% down the bar's height
+	ofDrawBitmapString(usageText, barX + barMaxWidth + 5, textBaselineY);
 	// --- End Bandwidth Usage Indicator ---
 
-	rightTextY += lineHeight * 1.2; // Move down for next stats line (this was original Y increment for title)
+	currentRightY += lineHeight * 1.5; // Space after title line for stats data
 
-	// Instant values (current frame/second)
+	// Instant values
 	ofSetColor(180, 180, 180);
-	ofDrawBitmapString("Instant:", rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString("C/s: " + ofToString(serialStats.avgCallsPerSecond, 1), rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString("B/s: " + ofToString(serialStats.avgBytesPerSecond, 0), rightTextX + 80, rightTextY);
+	ofDrawBitmapString("Instant:", rightTextX, currentRightY);
+	currentRightY += lineHeight;
+	ofDrawBitmapString("C/s: " + ofToString(serialStats.avgCallsPerSecond, 1), rightTextX, currentRightY);
+	ofDrawBitmapString("B/s: " + ofToString(serialStats.avgBytesPerSecond, 0), rightTextX + 80, currentRightY);
 
 	// 1-second average
-	ofDrawBitmapString("1s avg:", rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString("C: " + ofToString(serialStats.avgCallsPerSecond_1s, 1), rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString("B: " + ofToString(serialStats.avgBytesPerSecond_1s, 0), rightTextX + 80, rightTextY);
-
-	// 5-second average
-	ofDrawBitmapString("5s avg:", rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString("C: " + ofToString(serialStats.avgCallsPerSecond_5s, 1), rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString("B: " + ofToString(serialStats.avgBytesPerSecond_5s, 0), rightTextX + 80, rightTextY);
-
-	// 60-frame average
-	ofDrawBitmapString("60f avg:", rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString("C: " + ofToString(serialStats.avgCallsPerFrame_60f, 1), rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString("B: " + ofToString(serialStats.avgBytesPerFrame_60f, 1), rightTextX + 80, rightTextY);
+	currentRightY += lineHeight;
+	ofSetColor(220, 220, 220);
+	ofDrawBitmapString("1s avg:", rightTextX, currentRightY);
+	currentRightY += lineHeight;
+	ofDrawBitmapString("C: " + ofToString(serialStats.avgCallsPerSecond_1s, 1), rightTextX, currentRightY);
+	ofDrawBitmapString("B: " + ofToString(serialStats.avgBytesPerSecond_1s, 0), rightTextX + 80, currentRightY);
 
 	// Totals
+	currentRightY += lineHeight;
 	ofSetColor(160, 160, 160);
-	ofDrawBitmapString("Total:", rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString(ofToString(serialStats.totalCalls) + " calls", rightTextX, rightTextY += lineHeight);
-	ofDrawBitmapString(ofToString(serialStats.totalBytes) + " bytes", rightTextX, rightTextY += lineHeight);
+	ofDrawBitmapString("Total:", rightTextX, currentRightY);
+	currentRightY += lineHeight;
+	ofDrawBitmapString(ofToString(serialStats.totalCalls) + " calls", rightTextX, currentRightY);
+	currentRightY += lineHeight;
+	ofDrawBitmapString(ofToString(serialStats.totalBytes) + " bytes", rightTextX, currentRightY);
 
-	// Draw separator
+	currentRightY += lineHeight;
+	currentRightY += 30;
+
 	ofSetColor(100);
-	ofDrawLine(rightTextX + 10, rightTextY - lineHeight * 0.25, rightTextX + rightSectionWidth - 10, rightTextY - lineHeight * 0.25);
+	ofDrawLine(rightTextX, currentRightY - lineHeight, rightTextX + rightSectionWidth - 60, currentRightY - lineHeight);
 
 	// OSC Activity
 	ofSetColor(220, 220, 220);
-	ofDrawBitmapString("OSC Activity:", rightTextX, rightTextY += lineHeight * 1.5);
+	currentRightY += lineHeight;
+	ofDrawBitmapString("OSC:", rightTextX, currentRightY);
 	float timeSinceLastOSC = ofGetElapsedTimef() - lastOSCMessageTime;
 	if (timeSinceLastOSC < OSC_ACTIVITY_FADE_TIME) {
 		float alpha = ofMap(timeSinceLastOSC, 0, OSC_ACTIVITY_FADE_TIME, 255, 0);
-		ofSetColor(0, 255, 0, alpha); // Fading green
-		ofDrawCircle(rightTextX + 120, rightTextY - lineHeight * 0.3, 5); // Green dot
+		ofSetColor(0, 255, 0, alpha);
+		ofDrawCircle(rightTextX + 100, currentRightY - lineHeight * 0.3f + 2, 4); // Adjusted position and size
 	} else {
-		ofSetColor(100); // Dimmed if no recent activity
-		ofDrawCircle(rightTextX + 120, rightTextY - lineHeight * 0.3, 5); // Dim dot
+		ofSetColor(100);
+		ofDrawCircle(rightTextX + 100, currentRightY - lineHeight * 0.3f + 2, 4); // Adjusted position and size
 	}
-	rightTextY += lineHeight;
 }
 
 // Keyboard handling
@@ -1421,4 +1373,16 @@ void UIWrapper::updateDownLedArcFromOSC(int value) {
 	downLedArcParam.removeListener(this, &UIWrapper::onDownLedArcChanged);
 	downLedArcParam.set(value);
 	downLedArcParam.addListener(this, &UIWrapper::onDownLedArcChanged);
+}
+
+void UIWrapper::onSetZeroAllPressed() {
+	ofLogNotice("UIWrapper") << "Set Zero ALL Motors pressed";
+	if (hourglassManager) {
+		for (int i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
+			HourGlass * hg = hourglassManager->getHourGlass(i);
+			if (hg && hg->isConnected()) {
+				hg->setMotorZero(); // Call the HourGlass method
+			}
+		}
+	}
 }
