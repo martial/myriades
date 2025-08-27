@@ -44,16 +44,9 @@ HourGlass::HourGlass(const std::string & name)
 	, updatingFromOSC(false) // Initialized before 'connected' to match typical declaration order implied by warning
 	, connected(false)
 	, lastLedCommandSendTime(0.0f)
-	, motorAcceleration("motorAcceleration", 128, 0, 255)
-	, individualLuminosity("individualLuminosity", 1.0f, 0.0f, 1.0f)
-	, upLedBlend("upLedBlend", 0, 0, 768)
-	, upLedOrigin("upLedOrigin", 0, 0, 360)
-	, upLedArc("upLedArc", 360, 0, 360)
-	, downLedBlend("downLedBlend", 0, 0, 768)
-	, downLedOrigin("downLedOrigin", 0, 0, 360)
-	, downLedArc("downLedArc", 360, 0, 360)
 	, upEffectsManager()
-	, downEffectsManager() {
+	, downEffectsManager()
+	, oscOutController(nullptr) {
 	ofLogNotice("HourGlass") << "🏗️ Constructing HourGlass: " << name;
 
 	// Add parameters to the group
@@ -125,8 +118,9 @@ bool HourGlass::connect() {
 }
 
 bool HourGlass::isConnected() const {
+	// Always return true for OSC testing - serial connection not required
 	return true;
-	return connected && sharedSerialPort && sharedSerialPort->isInitialized();
+	// return connected && sharedSerialPort && sharedSerialPort->isInitialized();
 }
 
 void HourGlass::disconnect() {
@@ -145,37 +139,81 @@ void HourGlass::disconnect() {
 
 void HourGlass::setupControllers() {
 	// Setup Up LED/Magnet Controller
-	upLedMagnet = std::make_unique<LedMagnetController>(sharedSerialPort);
+	upLedMagnet.reset(new LedMagnetController(sharedSerialPort));
 	upLedMagnet->setId(upLedId);
 
 	// Setup Down LED/Magnet Controller
-	downLedMagnet = std::make_unique<LedMagnetController>(sharedSerialPort);
+	downLedMagnet.reset(new LedMagnetController(sharedSerialPort));
 	downLedMagnet->setId(downLedId);
 
 	// Setup Motor Controller
-	motor = std::make_unique<MotorController>(sharedSerialPort);
+	motor.reset(new MotorController(sharedSerialPort));
 	motor->setId(motorId);
+}
+
+// OSC Out configuration methods
+void HourGlass::setupOSCOut(const std::string & configPath) {
+	if (!oscOutController) {
+		oscOutController.reset(new OSCOutController());
+	}
+
+	if (!configPath.empty()) {
+		oscOutController->loadConfiguration(configPath);
+	} else {
+		// Use default config with HourGlass name suffix
+		std::string defaultPath = "osc_out_config_" + name + ".json";
+		oscOutController->loadConfiguration(defaultPath);
+	}
+
+	oscOutController->setup();
+	ofLogNotice("HourGlass") << name << " - OSC Out configured";
+}
+
+void HourGlass::setupOSCOutFromJson(const ofJson & oscConfig) {
+	if (!oscOutController) {
+		oscOutController.reset(new OSCOutController());
+	}
+
+	oscOutController->loadConfigurationFromJson(oscConfig);
+
+	ofLogNotice("HourGlass") << name << " - OSC Out configured from JSON";
+}
+
+void HourGlass::enableOSCOut(bool enabled) {
+	if (oscOutController) {
+		oscOutController->setEnabled(enabled);
+		ofLogNotice("HourGlass") << name << " - OSC Out " << (enabled ? "enabled" : "disabled");
+	}
+}
+
+bool HourGlass::isOSCOutEnabled() const {
+	return oscOutController && oscOutController->isEnabled();
 }
 
 // Convenience methods
 void HourGlass::enableMotor() {
-	if (isConnected() && motor) {
+	if (connected && motor) {
 		motor->enable();
-		ofLogNotice("HourGlass") << name << " - Motor enabled";
 	}
+	ofLogNotice("HourGlass") << name << " - Motor enabled";
 }
 
 void HourGlass::disableMotor() {
-	if (isConnected() && motor) {
+	if (connected && motor) {
 		motor->disable();
-		ofLogNotice("HourGlass") << name << " - Motor disabled";
 	}
+	ofLogNotice("HourGlass") << name << " - Motor disabled";
 }
 
 void HourGlass::emergencyStop() {
-	if (isConnected() && motor) {
+	if (connected && motor) {
 		motor->emergencyStop();
-		ofLogNotice("HourGlass") << name << " - Emergency stop";
+	}
+	ofLogNotice("HourGlass") << name << " - Emergency stop";
+
+	// Send OSC message if not updating from OSC (avoid feedback loops)
+	if (isOSCOutEnabled() && !updatingFromOSC) {
+		oscOutController->sendMotorEmergency(motorId);
 	}
 }
 
@@ -201,15 +239,23 @@ void HourGlass::setAllLEDs(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 void HourGlass::applyMotorParameters() {
-	if (!isConnected() || !motor) return;
+	// For OSC testing, allow motor parameter processing even without serial connection
+	bool hasSerialMotor = (connected && motor);
 
-	// Apply persistent settings
-	motor->setMicrostep(microstep.get()); // This is fine to call regularly
+	// Apply persistent settings (only if serial hardware available)
+	if (hasSerialMotor) {
+		motor->setMicrostep(microstep.get()); // This is fine to call regularly
 
-	if (motorEnabled.get()) {
-		motor->enable(); // Idempotent or controller handles repeated calls
-	} else {
-		motor->disable(); // Idempotent
+		if (motorEnabled.get()) {
+			motor->enable(); // Idempotent or controller handles repeated calls
+		} else {
+			motor->disable(); // Idempotent
+		}
+	}
+
+	// Send OSC message for microstep if not updating from OSC
+	if (isOSCOutEnabled() && !updatingFromOSC) {
+		oscOutController->sendMotorUstep(motorId, microstep.get());
 	}
 
 	// Determine speed and acceleration to use for pending commands
@@ -220,22 +266,62 @@ void HourGlass::applyMotorParameters() {
 	// Execute pending commands
 	if (executeRelativeMove) {
 		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing relative move: " << targetRelativeSteps;
-		motor->moveRelative(currentSpeed, currentAccel, targetRelativeSteps);
+
+		// Send to serial motor if available
+		if (hasSerialMotor) {
+			motor->moveRelative(currentSpeed, currentAccel, targetRelativeSteps);
+		}
+
+		// Send OSC message if not updating from OSC (avoid feedback loops)
+		if (isOSCOutEnabled() && !updatingFromOSC) {
+			// Convert steps to degrees for OSC message (simplified conversion)
+			float degrees = static_cast<float>(targetRelativeSteps) / (gearRatio.get() * calibrationFactor.get());
+			oscOutController->sendMotorRelative(motorId, currentSpeed, currentAccel, degrees);
+		}
 		executeRelativeMove = false;
 	}
 	if (executeAbsoluteMove) {
 		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing absolute move to: " << targetAbsolutePosition;
-		motor->moveAbsolute(currentSpeed, currentAccel, targetAbsolutePosition);
+
+		// Send to serial motor if available
+		if (hasSerialMotor) {
+			motor->moveAbsolute(currentSpeed, currentAccel, targetAbsolutePosition);
+		}
+
+		// Send OSC message if not updating from OSC (avoid feedback loops)
+		if (isOSCOutEnabled() && !updatingFromOSC) {
+			// Convert steps to degrees for OSC message (simplified conversion)
+			float degrees = static_cast<float>(targetAbsolutePosition) / (gearRatio.get() * calibrationFactor.get());
+			oscOutController->sendMotorAbsolute(motorId, currentSpeed, currentAccel, degrees);
+		}
 		executeAbsoluteMove = false;
 	}
 	if (executeRelativeAngle) {
 		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing relative angle: " << targetRelativeDegrees;
-		motor->moveRelativeAngle(currentSpeed, currentAccel, targetRelativeDegrees, gearRatio.get(), calibrationFactor.get());
+
+		// Send to serial motor if available
+		if (hasSerialMotor) {
+			motor->moveRelativeAngle(currentSpeed, currentAccel, targetRelativeDegrees, gearRatio.get(), calibrationFactor.get());
+		}
+
+		// Send OSC message if not updating from OSC (avoid feedback loops)
+		if (isOSCOutEnabled() && !updatingFromOSC) {
+			oscOutController->sendMotorRelative(motorId, currentSpeed, currentAccel, targetRelativeDegrees);
+		}
 		executeRelativeAngle = false;
 	}
 	if (executeAbsoluteAngle) {
 		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing absolute angle to: " << targetAbsoluteDegrees;
-		motor->moveAbsoluteAngle(currentSpeed, currentAccel, targetAbsoluteDegrees, gearRatio.get(), calibrationFactor.get());
+
+		// Send to serial motor if available
+		if (hasSerialMotor) {
+			motor->moveAbsoluteAngle(currentSpeed, currentAccel, targetAbsoluteDegrees, gearRatio.get(), calibrationFactor.get());
+		}
+
+		// Send OSC message if not updating from OSC (avoid feedback loops)
+		if (isOSCOutEnabled() && !updatingFromOSC) {
+			oscOutController->sendMotorAbsolute(motorId, currentSpeed, currentAccel, targetAbsoluteDegrees);
+		}
 		executeAbsoluteAngle = false;
 	}
 
@@ -272,7 +358,8 @@ void HourGlass::clearDownEffects() {
 
 // Modified applyLedParameters
 void HourGlass::applyLedParameters() {
-	if (!connected || !upLedMagnet || !downLedMagnet) return;
+	// For OSC testing, allow LED parameter processing even without serial connection
+	bool hasSerialHardware = (connected && upLedMagnet && downLedMagnet);
 
 	float currentTime = ofGetElapsedTimeMillis();
 	if (currentTime - lastLedCommandSendTime < MIN_LED_COMMAND_INTERVAL_MS) {
@@ -300,13 +387,43 @@ void HourGlass::applyLedParameters() {
 
 	float finalUpIndividualLuminosity = individualLuminosity.get() * upParams.effectLuminosityMultiplier;
 
-	// UNIFIED COMMAND: Send all LED parameters in one consistent format
-	upLedMagnet->sendAllLEDParameters(
-		upParams.color.r, upParams.color.g, upParams.color.b,
-		upParams.blend, upParams.origin, upParams.arc,
-		static_cast<uint8_t>(upParams.mainLedValue),
-		static_cast<uint8_t>(upPwm.get()),
-		finalUpIndividualLuminosity);
+	// UNIFIED COMMAND: Send all LED parameters in one consistent format (only if serial hardware available)
+	if (hasSerialHardware) {
+		upLedMagnet->sendAllLEDParameters(
+			upParams.color.r, upParams.color.g, upParams.color.b,
+			upParams.blend, upParams.origin, upParams.arc,
+			static_cast<uint8_t>(upParams.mainLedValue),
+			static_cast<uint8_t>(upPwm.get()),
+			finalUpIndividualLuminosity);
+	}
+
+	// Send OSC messages for UP LED only when parameters change (avoid flooding)
+	static ofColor lastUpColor;
+	static int lastUpOrigin = -1, lastUpArc = -1, lastUpPwm = -1, lastUpMainLed = -1;
+	static float lastUpLuminosity = -1.0f;
+
+	bool upParamsChanged = (upParams.color != lastUpColor || upParams.origin != lastUpOrigin || upParams.arc != lastUpArc || upPwm.get() != lastUpPwm || upParams.mainLedValue != lastUpMainLed || finalUpIndividualLuminosity != lastUpLuminosity);
+
+	if (isOSCOutEnabled() && !updatingFromOSC && upParamsChanged) {
+		// RGB LED control with alpha as master brightness
+		uint8_t masterAlpha = static_cast<uint8_t>(finalUpIndividualLuminosity * 255.0f);
+		oscOutController->sendRGBLED("top", upParams.color.r, upParams.color.g, upParams.color.b,
+			masterAlpha, upParams.origin, upParams.arc);
+
+		// Power LED control - Main LED slider controls power LED
+		oscOutController->sendPowerLED("top", static_cast<uint8_t>(upParams.mainLedValue));
+
+		// Electromagnet control - PWM slider controls magnet
+		oscOutController->sendMagnet("top", static_cast<uint8_t>(upPwm.get()));
+
+		// Update last values
+		lastUpColor = upParams.color;
+		lastUpOrigin = upParams.origin;
+		lastUpArc = upParams.arc;
+		lastUpPwm = upPwm.get();
+		lastUpMainLed = upParams.mainLedValue;
+		lastUpLuminosity = finalUpIndividualLuminosity;
+	}
 
 	// --- DOWN LED Controller ---
 	EffectParameters downParams;
@@ -325,13 +442,29 @@ void HourGlass::applyLedParameters() {
 
 	float finalDownIndividualLuminosity = individualLuminosity.get() * downParams.effectLuminosityMultiplier;
 
-	// UNIFIED COMMAND: Send all LED parameters in one consistent format
-	downLedMagnet->sendAllLEDParameters(
-		downParams.color.r, downParams.color.g, downParams.color.b,
-		downParams.blend, downParams.origin, downParams.arc,
-		static_cast<uint8_t>(downParams.mainLedValue),
-		static_cast<uint8_t>(downPwm.get()),
-		finalDownIndividualLuminosity);
+	// UNIFIED COMMAND: Send all LED parameters in one consistent format (only if serial hardware available)
+	if (hasSerialHardware) {
+		downLedMagnet->sendAllLEDParameters(
+			downParams.color.r, downParams.color.g, downParams.color.b,
+			downParams.blend, downParams.origin, downParams.arc,
+			static_cast<uint8_t>(downParams.mainLedValue),
+			static_cast<uint8_t>(downPwm.get()),
+			finalDownIndividualLuminosity);
+	}
+
+	// Send OSC messages for DOWN LED if not updating from OSC (avoid feedback loops)
+	if (isOSCOutEnabled() && !updatingFromOSC) {
+		// RGB LED control with alpha as master brightness
+		uint8_t masterAlpha = static_cast<uint8_t>(finalDownIndividualLuminosity * 255.0f);
+		oscOutController->sendRGBLED("bot", downParams.color.r, downParams.color.g, downParams.color.b,
+			masterAlpha, downParams.origin, downParams.arc);
+
+		// Power LED control - Main LED slider controls power LED
+		oscOutController->sendPowerLED("bot", static_cast<uint8_t>(downParams.mainLedValue));
+
+		// Electromagnet control - PWM slider controls magnet
+		oscOutController->sendMagnet("bot", static_cast<uint8_t>(downPwm.get()));
+	}
 
 	lastLedCommandSendTime = currentTime;
 }
@@ -369,9 +502,14 @@ void HourGlass::commandAbsoluteAngle(float degrees, std::optional<int> speed, st
 }
 
 void HourGlass::setMotorZero() {
-	if (isConnected() && motor) {
+	if (connected && motor) {
 		motor->setZero();
-		ofLogNotice("HourGlass") << name << " - Motor zero set";
+	}
+	ofLogNotice("HourGlass") << name << " - Motor zero set";
+
+	// Send OSC message if not updating from OSC (avoid feedback loops)
+	if (isOSCOutEnabled() && !updatingFromOSC) {
+		oscOutController->sendMotorZero(motorId);
 	}
 }
 

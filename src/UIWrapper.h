@@ -51,7 +51,14 @@ public:
 	// LED Visualizer access
 	LEDVisualizer & getLEDVisualizer() { return ledVisualizer; }
 
+	// Status section drawing helpers
+	void drawStatusSection_HourglassInfo(HourGlass * hg, float x, float & y, float lineHeight, float sectionWidth);
+	void drawStatusSection_KeyboardShortcuts(float x, float & y, float lineHeight, float sectionWidth);
+	void drawStatusSection_OSC(float x, float & y, float lineHeight);
+
 	// Methods for OSCController to update UI parameters safely
+	// These will also need to use the isInternallySyncing flag or ensure
+	// their programmatic .set() calls on UIWrapper params don't cause undesired listener firing.
 	void updateUpLedBlendFromOSC(int value);
 	void updateUpLedOriginFromOSC(int value);
 	void updateUpLedArcFromOSC(int value);
@@ -66,19 +73,23 @@ public:
 	ofParameter<float> currentHgIndividualLuminosityParam { "Indiv. Luminosity", 1.0f, 0.0f, 1.0f };
 	ofxFloatSlider currentHgIndividualLuminositySlider;
 
-	// LED effect parameters - now public
-	ofParameter<int> upLedBlendParam;
-	ofParameter<int> upLedOriginParam;
-	ofParameter<int> upLedArcParam;
-	ofParameter<int> downLedBlendParam;
-	ofParameter<int> downLedOriginParam;
-	ofParameter<int> downLedArcParam;
+	// LED effect parameters - now public and named
+	ofParameter<int> upLedBlendParam { "Up Blend", 0, 0, 768 };
+	ofParameter<int> upLedOriginParam { "Up Origin", 0, 0, 360 };
+	ofParameter<int> upLedArcParam { "Up Arc", 360, 0, 360 };
+	ofParameter<int> downLedBlendParam { "Down Blend", 0, 0, 768 };
+	ofParameter<int> downLedOriginParam { "Down Origin", 0, 0, 360 };
+	ofParameter<int> downLedArcParam { "Down Arc", 360, 0, 360 };
 
 	static const float OSC_ACTIVITY_FADE_TIME; // How long the dot stays visible
+
+	// Add this method declaration
+	void drawMinimalView();
 
 private:
 	// Add this member variable
 	ViewMode currentViewMode;
+	bool isInternallySyncing = false; // Flag to prevent recursion during sync
 
 	OSCController * oscControllerInstance = nullptr; // Pointer to OSCController
 	HourGlassManager * hourglassManager;
@@ -108,7 +119,7 @@ private:
 	ofParameter<void> allOffBtnParam;
 	ofParameter<void> ledsOffBtnParam;
 	ofParameter<void> setZeroAllBtnParam; // New param for Set Zero All
-	ofParameter<int> downPwm;
+	ofParameter<int> downPwm; // This seems like a leftover, should it be named or grouped?
 
 	// Direct UI elements (Buttons, Text Inputs)
 	ofxButton connectBtn, disconnectBtn;
@@ -119,6 +130,8 @@ private:
 	ofxFloatField gearRatioInput, calibrationFactorInput; // Text input for precise calibration control
 
 	// UI sliders for LED effect parameters (separate for up and down)
+	// These ofxIntSlider objects might become redundant if panels directly use ofParameter<int>
+	// or if they are managed more generically. For now, keeping them if they are explicitly used.
 	ofxIntSlider upLedBlendSlider, upLedOriginSlider, upLedArcSlider;
 	ofxIntSlider downLedBlendSlider, downLedOriginSlider, downLedArcSlider;
 
@@ -158,7 +171,7 @@ private:
 	void onGearRatioChanged(float & value);
 	void onCalibrationFactorChanged(float & value);
 
-	// LED parameter listeners
+	// LED parameter listeners (RGB Color, Main LED, PWM)
 	void onUpLedColorChanged(ofColor & color);
 	void onDownLedColorChanged(ofColor & color);
 	void onUpMainLedChanged(int & value);
@@ -166,7 +179,7 @@ private:
 	void onUpPwmChanged(int & value);
 	void onDownPwmChanged(int & value);
 
-	// LED effect parameter listeners (separate for up and down)
+	// Original individual listeners for LED Effect int parameters (Blend, Origin, Arc)
 	void onUpLedBlendChanged(int & value);
 	void onUpLedOriginChanged(int & value);
 	void onUpLedArcChanged(int & value);
@@ -188,8 +201,8 @@ private:
 	void handleViewToggle(int key); // Added declaration
 
 	// Throttling for color updates
-	float lastColorUpdateTime;
-	const float COLOR_UPDATE_INTERVAL = 0.05f; // Update at most 20 times per second
+	// float lastColorUpdateTime; // Commented out as unused
+	// const float COLOR_UPDATE_INTERVAL = 0.05f; // Commented out as unused
 
 	// Helper method for color presets
 	void setColorPreset(const ofColor & color);
@@ -209,6 +222,10 @@ private:
 	void updateUIPanelsBinding();
 	void updateListenersForCurrentHourglass();
 
-	// Add this method declaration
-	void drawMinimalView();
+	// Helper for setting up common panel properties
+	void setupStyledPanel(ofxPanel & panel, const std::string & panelName, const std::string & settingsFilename, float x, float y);
+
+	// Helpers for XML serialization
+	void saveHourGlassToXml(ofXml & hgNode, HourGlass * hg, int hgIndex);
+	void loadHourGlassFromXml(const ofXml & hgNode, HourGlass * hg, int hgIndex);
 };

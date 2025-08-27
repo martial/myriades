@@ -5,6 +5,7 @@
 #include "EffectsManager.h"
 #include "LedMagnetController.h"
 #include "MotorController.h"
+#include "OSCOutController.h"
 #include "SerialPortManager.h"
 #include "ofMain.h"
 #include "ofParameter.h"
@@ -28,6 +29,13 @@ public:
 	bool connect();
 	bool isConnected() const;
 	void disconnect();
+
+	// OSC Out configuration
+	void setupOSCOut(const std::string & configPath = "");
+	void setupOSCOutFromJson(const ofJson & oscConfig);
+	void enableOSCOut(bool enabled = true);
+	bool isOSCOutEnabled() const;
+	OSCOutController * getOSCOut() const { return oscOutController.get(); }
 
 	// Access to controllers
 	LedMagnetController * getUpLedMagnet() { return upLedMagnet.get(); }
@@ -114,6 +122,7 @@ private:
 	std::unique_ptr<LedMagnetController> upLedMagnet;
 	std::unique_ptr<LedMagnetController> downLedMagnet;
 	std::unique_ptr<MotorController> motor;
+	std::unique_ptr<OSCOutController> oscOutController;
 
 	// Configuration IDs
 	int upLedId;

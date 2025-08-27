@@ -105,7 +105,7 @@ void HourGlassManager::createDefaultConfiguration() {
 }
 
 void HourGlassManager::addHourGlass(const std::string & name, int upLedId, int downLedId, int motorId) {
-	auto hourglass = std::make_unique<HourGlass>(name);
+	auto hourglass = std::unique_ptr<HourGlass>(new HourGlass(name));
 	hourglass->configure(sharedSerialPort, sharedBaudRate, upLedId, downLedId, motorId);
 	hourglasses.push_back(std::move(hourglass));
 
@@ -231,6 +231,32 @@ ofJson HourGlassManager::createHourGlassJson(const HourGlass & hourglass) const 
 	json["upLedId"] = hourglass.getUpLedId();
 	json["downLedId"] = hourglass.getDownLedId();
 	json["motorId"] = hourglass.getMotorId();
+	
+	// Add OSC configuration if OSC Out is configured
+	if (hourglass.isOSCOutEnabled()) {
+		auto oscOut = hourglass.getOSCOut();
+		if (oscOut) {
+			ofJson oscConfig;
+			oscConfig["enabled"] = oscOut->isEnabled();
+			
+			// Save destinations
+			auto destinations = oscOut->getDestinations();
+			if (!destinations.empty()) {
+				oscConfig["destinations"] = ofJson::array();
+				for (const auto& dest : destinations) {
+					ofJson destJson;
+					destJson["name"] = dest.name;
+					destJson["ip"] = dest.ip;
+					destJson["port"] = dest.port;
+					destJson["enabled"] = dest.enabled;
+					oscConfig["destinations"].push_back(destJson);
+				}
+			}
+			
+			json["oscOut"] = oscConfig;
+		}
+	}
+	
 	return json;
 }
 
@@ -270,6 +296,18 @@ bool HourGlassManager::parseHourGlassJson(const ofJson & json) {
 										<< " (UpLED:" << upLedId << ", DownLED:" << downLedId << ", Motor:" << motorId << ")";
 
 		addHourGlass(name, upLedId, downLedId, motorId);
+		
+		// Setup OSC Out if configuration exists
+		if (json.contains("oscOut")) {
+			ofLogNotice("HourGlassManager") << "📡 Setting up OSC Out for: " << name;
+			auto hg = getHourGlass(name);
+			if (hg) {
+				hg->setupOSCOutFromJson(json["oscOut"]);
+				hg->enableOSCOut(true);
+				ofLogNotice("HourGlassManager") << "✅ OSC Out configured for: " << name;
+			}
+		}
+		
 		return true;
 
 	} catch (const std::exception & e) {

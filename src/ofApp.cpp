@@ -10,7 +10,7 @@ void ofApp::setup() {
 	ofEnableAntiAliasing();
 	ofEnableSmoothing();
 
-	// Initialize HourGlass system
+	// Initialize HourGlass system (OSC Out is configured automatically from hourglasses.json)
 	ofLogNotice("ofApp") << "Initializing HourGlass system";
 	hourglassManager.loadConfiguration("hourglasses.json");
 	hourglassManager.connectAll();
@@ -30,21 +30,17 @@ void ofApp::setup() {
 //--------------------------------------------------------------
 void ofApp::update() {
 	ofSetLogLevel(OF_LOG_VERBOSE);
-	// ofLogVerbose("ofApp::update") << "Start of ofApp::update()"; // COMMENTED BACK
 
 	// Update OSC controller (process incoming messages)
 	oscController.update();
 
-	// ofLogVerbose("ofApp::update") << "Calling ui.update()"; // COMMENTED BACK
 	// Update UI
 	ui.update();
 
-	// ofLogVerbose("ofApp::update") << "End of ofApp::update()"; // COMMENTED BACK
 }
 
 //--------------------------------------------------------------
 void ofApp::draw() {
-	// Modern dark gradient background
 	ofBackgroundGradient(ofColor(30, 30, 35), ofColor(15, 15, 20));
 
 	// Draw UI (panels and status)

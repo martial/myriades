@@ -1,6 +1,7 @@
 #include "OSCController.h"
 #include "OSCHelper.h"
 #include "UIWrapper.h"
+#include "ofMain.h"
 
 OSCController::OSCController(HourGlassManager * manager)
 	: hourglassManager(manager)
