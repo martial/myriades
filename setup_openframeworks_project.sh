@@ -98,12 +98,13 @@ download_openframeworks() {
 # Clone the project repository
 setup_project() {
     local of_dir="of_v${OF_VERSION}_${OF_PLATFORM}_release"
-    local project_path="$of_dir/apps/myApps/$PROJECT_NAME"
+    local apps_dir="$of_dir/apps/myApps"
+    local project_path="$apps_dir/$PROJECT_NAME"
     
     log_info "Setting up project repository..."
     
     # Create myApps directory if it doesn't exist
-    mkdir -p "$of_dir/apps/myApps"
+    mkdir -p "$apps_dir"
     
     # Clone or update the repository
     if [[ -d "$project_path" ]]; then
@@ -115,13 +116,15 @@ setup_project() {
         cd - > /dev/null
     else
         log_info "Cloning repository..."
-        git clone -b "$REPO_BRANCH" "$REPO_URL" "$project_path" || {
+        cd "$apps_dir"
+        git clone -b "$REPO_BRANCH" "$REPO_URL" "$PROJECT_NAME" || {
             log_error "Failed to clone repository"
             exit 1
         }
+        cd - > /dev/null
     fi
     
-    log_success "Project repository set up"
+    log_success "Project repository set up at $project_path"
 }
 
 # Compile OpenFrameworks libraries
