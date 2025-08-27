@@ -65,7 +65,7 @@ check_system() {
 # Download and extract OpenFrameworks
 download_openframeworks() {
     local of_dir="of_v${OF_VERSION}_${OF_PLATFORM}_release"
-    local of_archive="${of_dir}.zip"
+    local of_archive="${of_dir}.tar.gz"
     local of_url="https://github.com/openframeworks/openFrameworks/releases/download/${OF_VERSION}/${of_archive}"
     
     log_info "Downloading OpenFrameworks v${OF_VERSION} for ${OF_PLATFORM}..."
@@ -88,7 +88,7 @@ download_openframeworks() {
     
     # Extract
     log_info "Extracting OpenFrameworks..."
-    unzip -q "$of_archive" || {
+    tar -xzf "$of_archive" || {
         log_error "Failed to extract OpenFrameworks"
         exit 1
     }
