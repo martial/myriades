@@ -11,7 +11,7 @@ void ofApp::setup() {
 	ofEnableSmoothing();
 
 	// Initialize HourGlass system (OSC Out is configured automatically from hourglasses.json)
-	ofLogNotice("ofApp") << "Initializing HourGlass system";
+
 	hourglassManager.loadConfiguration("hourglasses.json");
 	hourglassManager.connectAll();
 
@@ -22,9 +22,6 @@ void ofApp::setup() {
 	oscController.setup(8000); // Default receive port
 	oscController.setUIWrapper(&ui); // Enable UI position parameter synchronization
 	oscController.setEnabled(true);
-	ofLogNotice("ofApp") << "🎛️ OSC Controller initialized on port 8000 (receiver only) with UI sync";
-
-	ofLogNotice("ofApp") << "Setup complete";
 }
 
 //--------------------------------------------------------------
@@ -36,7 +33,6 @@ void ofApp::update() {
 
 	// Update UI
 	ui.update();
-
 }
 
 //--------------------------------------------------------------

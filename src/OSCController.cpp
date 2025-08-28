@@ -8,7 +8,7 @@ OSCController::OSCController(HourGlassManager * manager)
 	, uiWrapper(nullptr)
 	, oscEnabled(false)
 	, receivePort(8000) {
-	ofLogNotice("OSCController") << "🎛️ OSC Controller initialized";
+
 	loadMotorPresets(); // Load presets on construction
 }
 
@@ -19,9 +19,8 @@ OSCController::~OSCController() {
 void OSCController::setup(int receivePort) {
 	this->receivePort = receivePort;
 	receiver.setup(receivePort);
-	ofLogNotice("OSCController") << "📡 OSC Receiver listening on port " << receivePort;
+
 	oscEnabled = true;
-	ofLogNotice("OSCController") << "✅ OSC Controller setup complete";
 }
 
 void OSCController::update() {
@@ -38,7 +37,6 @@ void OSCController::update() {
 void OSCController::shutdown() {
 	if (oscEnabled) {
 		oscEnabled = false;
-		ofLogNotice("OSCController") << "🔌 OSC Controller shutdown";
 	}
 }
 
@@ -126,13 +124,10 @@ void OSCController::handleConnectionMessage(ofxOscMessage & msg) {
 
 	if (addressParts.size() == 2) {
 		if (addressParts[1] == "connect") {
-			hourglassManager->connectAll();
-			ofLogNotice("OSCController") << "🔗 OSC: Connect all hourglasses command received";
+
 		} else if (addressParts[1] == "disconnect") {
-			hourglassManager->disconnectAll();
-			ofLogNotice("OSCController") << "❌ OSC: Disconnect all hourglasses command received";
+
 		} else if (addressParts[1] == "status") {
-			ofLogNotice("OSCController") << "📊 OSC: Global status request received (no longer broadcasts)";
 		}
 	} else if (addressParts.size() == 3) {
 		int hourglassId = extractHourglassId(addressParts);
@@ -146,13 +141,10 @@ void OSCController::handleConnectionMessage(ofxOscMessage & msg) {
 			return;
 		}
 		if (addressParts[2] == "connect") {
-			bool success = hg->connect();
-			ofLogNotice("OSCController") << "🔗 OSC: " << (success ? "Connected" : "Failed to connect") << " hourglass " << hourglassId;
+
 		} else if (addressParts[2] == "disconnect") {
-			hg->disconnect();
-			ofLogNotice("OSCController") << "❌ OSC: Disconnected hourglass " << hourglassId;
+
 		} else if (addressParts[2] == "status") {
-			ofLogNotice("OSCController") << "📊 OSC: Status request for hourglass " << hourglassId << " (connected: " << hg->isConnected() << ") (no longer broadcasts)";
 		}
 	}
 }
@@ -177,8 +169,8 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		return;
 	}
 	HourGlass * hg = getHourglassById(hourglassId);
-	if (!hg || !hg->isConnected()) {
-		sendError(address, "Hourglass not connected: " + addressParts[1]);
+	if (!hg) {
+		sendError(address, "Hourglass not found: " + addressParts[1]);
 		return;
 	}
 	MotorController * motor = hg->getMotor();
@@ -190,15 +182,15 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		hg->updatingFromOSC = true;
 		hg->motorEnabled.set(enable);
 		hg->updatingFromOSC = false;
-		ofLogNotice("OSCController") << "⚡ OSC: Motor enabled state set to " << (enable ? "true" : "false") << " for hourglass " << hourglassId;
+
 	} else if (command == "emergency_stop") {
 		motor->emergencyStop();
 		hg->emergencyStop();
-		ofLogNotice("OSCController") << "🚨 OSC: Emergency stop for hourglass " << hourglassId;
+
 	} else if (command == "set_zero") {
 		motor->setZero();
 		hg->setMotorZero();
-		ofLogNotice("OSCController") << "🎯 OSC: Set zero for hourglass " << hourglassId;
+
 	} else if (command == "microstep") {
 		if (!OSCHelper::validateParameters(msg, 1, "motor_microstep")) return;
 		int microstep = OSCHelper::getArgument<int>(msg, 0, 16);
@@ -236,14 +228,14 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		std::optional<int> speed_opt = msg.getNumArgs() > 1 ? std::optional<int>(OSCHelper::getArgument<int>(msg, 1)) : std::nullopt;
 		std::optional<int> accel_opt = msg.getNumArgs() > 2 ? std::optional<int>(OSCHelper::getArgument<int>(msg, 2)) : std::nullopt;
 		hg->commandRelativeMove(steps, speed_opt, accel_opt);
-		ofLogNotice("OSCController") << "↕️ OSC: Commanded relative move " << steps << " for HG " << hourglassId;
+
 	} else if (command == "move_absolute") {
 		if (!OSCHelper::validateParameters(msg, 1, "motor_move_absolute")) return;
 		int position = OSCHelper::getArgument<int>(msg, 0, 0);
 		std::optional<int> speed_opt = msg.getNumArgs() > 1 ? std::optional<int>(OSCHelper::getArgument<int>(msg, 1)) : std::nullopt;
 		std::optional<int> accel_opt = msg.getNumArgs() > 2 ? std::optional<int>(OSCHelper::getArgument<int>(msg, 2)) : std::nullopt;
 		hg->commandAbsoluteMove(position, speed_opt, accel_opt);
-		ofLogNotice("OSCController") << "📍 OSC: Commanded absolute move to " << position << " for HG " << hourglassId;
+
 	} else if (command == "rotate") {
 		float degrees_val;
 		std::optional<int> speed_opt = std::nullopt;
@@ -265,7 +257,7 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		}
 		hg->commandRelativeAngle(degrees_val, speed_opt, accel_opt);
 		updateUIAngleParameters(degrees_val, 0);
-		ofLogNotice("OSCController") << "🔄 OSC: Commanded relative angle " << degrees_val << " for HG " << hourglassId;
+
 	} else if (command == "position") {
 		float degrees_val;
 		std::optional<int> speed_opt = std::nullopt;
@@ -287,7 +279,7 @@ void OSCController::handleMotorMessage(ofxOscMessage & msg) {
 		}
 		hg->commandAbsoluteAngle(degrees_val, speed_opt, accel_opt);
 		updateUIAngleParameters(0, degrees_val);
-		ofLogNotice("OSCController") << "🎯 OSC: Commanded absolute angle to " << degrees_val << " for HG " << hourglassId;
+
 	} else {
 		sendError(address, "Unknown motor command: " + command);
 	}
@@ -319,7 +311,7 @@ void OSCController::handleLedMessage(ofxOscMessage & msg) {
 
 	// Apply to all targeted hourglasses
 	for (HourGlass * hg : hourglasses) {
-		if (!hg || !hg->isConnected()) continue;
+		if (!hg) continue;
 
 		int hourglassId = -1;
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); i++) {
@@ -354,7 +346,6 @@ void OSCController::handleLedMessage(ofxOscMessage & msg) {
 	// Log success for multi-targeting
 	if (hourglassIds.size() > 1) {
 		std::string targetStr = addressParts[1];
-		ofLogNotice("OSCController") << "🎨 OSC: LED command applied to " << hourglasses.size() << " hourglasses (target: " << targetStr << ")";
 	}
 }
 
@@ -629,23 +620,20 @@ void OSCController::handleSystemMessage(ofxOscMessage & msg) {
 	string command = addressParts[1];
 	if (command == "list_devices") {
 		auto devices = hourglassManager->getAvailableSerialPorts();
-		ofLogNotice("OSCController") << "📋 OSC: List devices command received. Devices available: " << devices.size();
-		for (const auto & device : devices) {
-			ofLogNotice("OSCController") << "  - " << device;
-		}
+
 	} else if (command == "emergency_stop_all") {
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); i++) {
 			auto * hg = hourglassManager->getHourGlass(i);
-			if (hg && hg->isConnected()) hg->emergencyStop();
+			if (hg) hg->emergencyStop();
 		}
-		ofLogNotice("OSCController") << "🚨 OSC: Emergency stop ALL hourglasses command received";
+
 	} else {
 		sendError(address, "Unknown system command: " + command);
 	}
 }
 
 void OSCController::handleGlobalBlackoutMessage(ofxOscMessage & msg) {
-	ofLogNotice("OSCController") << "⚫ OSC: GLOBAL Blackout command received. Setting global luminosity to 0.";
+
 	LedMagnetController::setGlobalLuminosity(0.0f);
 	if (uiWrapper) {
 		uiWrapper->updateGlobalLuminositySlider(0.0f);
@@ -661,7 +649,7 @@ void OSCController::handleGlobalLuminosityMessage(ofxOscMessage & msg) {
 	luminosity = OSCHelper::clamp(luminosity, 0.0f, 1.0f);
 
 	LedMagnetController::setGlobalLuminosity(luminosity);
-	ofLogNotice("OSCController") << "💡 OSC: Global luminosity set to " << luminosity;
+
 	if (uiWrapper) {
 		uiWrapper->updateGlobalLuminositySlider(luminosity);
 	}
@@ -683,7 +671,6 @@ void OSCController::handleIndividualLuminosityMessage(ofxOscMessage & msg) {
 
 	// Handle "all" syntax for individual luminosity
 	if (addressParts[1] == "all") {
-		ofLogNotice("OSCController") << "💡 OSC: Setting individual luminosity to " << luminosityValue << " for ALL hourglasses";
 
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); i++) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);
@@ -739,8 +726,8 @@ void OSCController::handleMotorPresetMessage(ofxOscMessage & msg) {
 	}
 
 	HourGlass * hg = getHourglassById(hourglassId);
-	if (!hg || !hg->isConnected()) {
-		sendError(address, "Hourglass not connected for motor preset: " + addressParts[1]);
+	if (!hg) {
+		sendError(address, "Hourglass not found for motor preset: " + addressParts[1]);
 		return;
 	}
 
@@ -761,9 +748,7 @@ void OSCController::handleMotorPresetMessage(ofxOscMessage & msg) {
 		hg->motorSpeed.set(newSpeed);
 		hg->motorAcceleration.set(newAccel);
 		hg->updatingFromOSC = false;
-		ofLogNotice("OSCController") << "🏃🚀 OSC: Motor preset '" << presetName
-									 << "' applied to HG " << hourglassId
-									 << " (Speed: " << newSpeed << ", Accel: " << newAccel << ")";
+
 	} else {
 		sendError(address, "Unknown motor preset: '" + presetName + "'. Loaded presets: " + ofToString(motorPresets.size()));
 	}
@@ -784,10 +769,9 @@ void OSCController::handleSystemMotorPresetMessage(ofxOscMessage & msg) {
 			return;
 		}
 
-		ofLogNotice("OSCController") << "🏃🚀 OSC: System motor preset '" << presetName << "' applying to ALL hourglasses (Speed: " << newSpeed << ", Accel: " << newAccel << ")";
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg && hg->isConnected()) {
+			if (hg) {
 				hg->updatingFromOSC = true;
 				hg->motorSpeed.set(newSpeed);
 				hg->motorAcceleration.set(newAccel);
@@ -813,10 +797,10 @@ void OSCController::handleSystemMotorConfigMessage(ofxOscMessage & msg, const st
 			OSCHelper::logError("system_motor_config", address, "Invalid speed/acceleration. Speed(0-500): " + ofToString(speed_val) + ", Accel(0-255): " + ofToString(accel_val));
 			return;
 		}
-		ofLogNotice("OSCController") << "⚙️ OSC: System motor config applying to ALL hourglasses (Speed: " << speed_val << ", Accel: " << accel_val << ")";
+
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg) { // No need to check isConnected here, just set params
+			if (hg) { // Just check if hourglass exists
 				hg->updatingFromOSC = true;
 				hg->motorSpeed.set(speed_val);
 				hg->motorAcceleration.set(accel_val);
@@ -841,8 +825,8 @@ void OSCController::handleIndividualMotorConfigMessage(ofxOscMessage & msg, cons
 		return;
 	}
 	HourGlass * hg = getHourglassById(hourglassId);
-	if (!hg || !hg->isConnected()) {
-		sendError(address, "Hourglass not connected for motor config: " + addressParts[1]);
+	if (!hg) {
+		sendError(address, "Hourglass not found for motor config: " + addressParts[1]);
 		return;
 	}
 
@@ -875,10 +859,9 @@ void OSCController::handleSystemMotorRotateMessage(ofxOscMessage & msg, const st
 		std::optional<int> speed_opt = (addressParts.size() > 4) ? std::optional<int>(std::stoi(addressParts[4])) : std::nullopt;
 		std::optional<int> accel_opt = (addressParts.size() > 5) ? std::optional<int>(std::stoi(addressParts[5])) : std::nullopt;
 
-		ofLogNotice("OSCController") << "🔄 OSC: System motor rotate " << degrees << "° applying to ALL HGs.";
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg && hg->isConnected()) { // Check isConnected before commanding a move
+			if (hg) { // Just check if hourglass exists
 				// Here, we use the provided speed/accel if available, otherwise HourGlass::applyMotorParameters will use its own defaults
 				hg->commandRelativeAngle(degrees, speed_opt, accel_opt);
 			}
@@ -899,10 +882,9 @@ void OSCController::handleSystemMotorPositionMessage(ofxOscMessage & msg, const 
 		std::optional<int> speed_opt = (addressParts.size() > 4) ? std::optional<int>(std::stoi(addressParts[4])) : std::nullopt;
 		std::optional<int> accel_opt = (addressParts.size() > 5) ? std::optional<int>(std::stoi(addressParts[5])) : std::nullopt;
 
-		ofLogNotice("OSCController") << "🎯 OSC: System motor position to " << degrees << "° applying to ALL HGs.";
 		for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg && hg->isConnected()) { // Check isConnected
+			if (hg) { // Just check if hourglass exists
 				hg->commandAbsoluteAngle(degrees, speed_opt, accel_opt);
 			}
 		}
@@ -912,17 +894,17 @@ void OSCController::handleSystemMotorPositionMessage(ofxOscMessage & msg, const 
 }
 
 void OSCController::handleSystemSetZeroAllMessage(ofxOscMessage & msg) {
-	ofLogNotice("OSCController") << "🎯 OSC: Set Zero ALL Motors command received";
+
 	for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 		HourGlass * hg = hourglassManager->getHourGlass(i);
-		if (hg && hg->isConnected()) {
+		if (hg) {
 			hg->setMotorZero();
 		}
 	}
 }
 
 void OSCController::forceRefreshAllHardwareStates() {
-	ofLogNotice("OSCController") << "Forcing refresh of all hardware states (excluding PWM).";
+
 	for (size_t i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 		HourGlass * hg = hourglassManager->getHourGlass(i);
 		if (hg) {
@@ -1064,7 +1046,6 @@ void OSCController::logOSCMessage(const ofxOscMessage & msg, const string & acti
 		else if (msg.getArgType(i) == OFXOSC_TYPE_TRUE || msg.getArgType(i) == OFXOSC_TYPE_FALSE)
 			args += msg.getArgAsBool(i) ? "true" : "false";
 	}
-	ofLogNotice("OSCController") << "OSC " << action << ": " << msg.getAddress() << (args.empty() ? "" : " [" + args + "]");
 }
 
 void OSCController::updateUIAngleParameters(float relativeAngle, float absoluteAngle) {
@@ -1118,7 +1099,7 @@ void OSCController::loadMotorPresets(const std::string & filename) {
 			int speed = item["speed"].get<int>();
 			int acceleration = item["acceleration"].get<int>();
 			motorPresets[name] = { speed, acceleration };
-			ofLogNotice("OSCController") << "Loaded motor preset: " << name << " (Speed: " << speed << ", Accel: " << acceleration << ")";
+
 		} else {
 			ofLogWarning("OSCController") << "Skipping invalid preset item in " << filename;
 		}

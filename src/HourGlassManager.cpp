@@ -14,8 +14,6 @@ HourGlassManager::~HourGlassManager() {
 bool HourGlassManager::loadConfiguration(const std::string & configFile) {
 	configFilePath = configFile;
 
-	ofLogNotice("HourGlassManager") << "🔍 Loading configuration from: " << configFile;
-
 	ofFile file(configFile);
 	if (!file.exists()) {
 		ofLogWarning("HourGlassManager") << "Config file not found: " << configFile << " - Creating default";
@@ -25,7 +23,6 @@ bool HourGlassManager::loadConfiguration(const std::string & configFile) {
 
 	try {
 		ofJson json = ofLoadJson(configFile);
-		ofLogNotice("HourGlassManager") << "📄 JSON file loaded successfully";
 
 		if (!json.contains("hourglasses")) {
 			ofLogError("HourGlassManager") << "Invalid config file: missing 'hourglasses' array";
@@ -35,11 +32,9 @@ bool HourGlassManager::loadConfiguration(const std::string & configFile) {
 		// Load shared serial port configuration
 		if (json.contains("serialPort")) {
 			sharedSerialPort = json["serialPort"];
-			ofLogNotice("HourGlassManager") << "📡 Serial Port from JSON: " << sharedSerialPort;
 		}
 		if (json.contains("baudRate")) {
 			sharedBaudRate = json["baudRate"];
-			ofLogNotice("HourGlassManager") << "⚡ Baud Rate from JSON: " << sharedBaudRate;
 		}
 
 		// Clear existing hourglasses
@@ -47,7 +42,7 @@ bool HourGlassManager::loadConfiguration(const std::string & configFile) {
 		hourglasses.clear();
 
 		// Load each hourglass
-		ofLogNotice("HourGlassManager") << "🔧 Parsing hourglasses from JSON...";
+
 		for (const auto & hourglassJson : json["hourglasses"]) {
 			if (!parseHourGlassJson(hourglassJson)) {
 				ofLogError("HourGlassManager") << "Failed to parse hourglass configuration";
@@ -55,7 +50,6 @@ bool HourGlassManager::loadConfiguration(const std::string & configFile) {
 			}
 		}
 
-		ofLogNotice("HourGlassManager") << "✅ Successfully loaded " << hourglasses.size() << " hourglasses from " << configFile;
 		return true;
 
 	} catch (const std::exception & e) {
@@ -67,7 +61,6 @@ bool HourGlassManager::loadConfiguration(const std::string & configFile) {
 }
 
 bool HourGlassManager::saveConfiguration(const std::string & configFile) {
-	ofLogNotice("HourGlassManager") << "💾 Saving configuration to: " << configFile;
 
 	try {
 		ofJson json;
@@ -80,7 +73,7 @@ bool HourGlassManager::saveConfiguration(const std::string & configFile) {
 		}
 
 		ofSaveJson(configFile, json);
-		ofLogNotice("HourGlassManager") << "✅ Configuration saved to " << configFile;
+
 		return true;
 
 	} catch (const std::exception & e) {
@@ -94,27 +87,15 @@ void HourGlassManager::createDefaultConfiguration() {
 	disconnectAll();
 	hourglasses.clear();
 
-	ofLogNotice("HourGlassManager") << "🔧 Creating default HourGlass configuration...";
-	ofLogNotice("HourGlassManager") << "📡 Shared Serial Port: " << sharedSerialPort << " @ " << sharedBaudRate << " baud";
-
 	// Add default hourglasses
 	addHourGlass("HourGlass1", 11, 12, 1);
 	addHourGlass("HourGlass2", 21, 22, 2);
-
-	ofLogNotice("HourGlassManager") << "🎯 Default configuration complete: " << hourglasses.size() << " hourglasses created";
 }
 
 void HourGlassManager::addHourGlass(const std::string & name, int upLedId, int downLedId, int motorId) {
 	auto hourglass = std::unique_ptr<HourGlass>(new HourGlass(name));
 	hourglass->configure(sharedSerialPort, sharedBaudRate, upLedId, downLedId, motorId);
 	hourglasses.push_back(std::move(hourglass));
-
-	ofLogNotice("HourGlassManager") << "✅ Created HourGlass: " << name
-									<< " | Port: " << sharedSerialPort
-									<< " | Baud: " << sharedBaudRate
-									<< " | UpLED: " << upLedId
-									<< " | DownLED: " << downLedId
-									<< " | Motor: " << motorId;
 }
 
 bool HourGlassManager::removeHourGlass(const std::string & name) {
@@ -126,7 +107,7 @@ bool HourGlassManager::removeHourGlass(const std::string & name) {
 	if (it != hourglasses.end()) {
 		(*it)->disconnect();
 		hourglasses.erase(it);
-		ofLogNotice("HourGlassManager") << "Removed hourglass: " << name;
+
 		return true;
 	}
 
@@ -155,7 +136,6 @@ bool HourGlassManager::connectAll() {
 		}
 	}
 
-	ofLogNotice("HourGlassManager") << "Connect all: " << (allConnected ? "SUCCESS" : "PARTIAL");
 	return allConnected;
 }
 
@@ -173,14 +153,13 @@ void HourGlassManager::disconnectAll() {
 	for (auto & hourglass : hourglasses) {
 		hourglass->disconnect();
 	}
-	ofLogNotice("HourGlassManager") << "Disconnected all hourglasses";
 }
 
 void HourGlassManager::disconnectHourGlass(const std::string & name) {
 	auto * hourglass = getHourGlass(name);
 	if (hourglass) {
 		hourglass->disconnect();
-		ofLogNotice("HourGlassManager") << "Disconnected hourglass: " << name;
+
 	} else {
 		ofLogWarning("HourGlassManager") << "Cannot disconnect - hourglass not found: " << name;
 	}
@@ -231,19 +210,19 @@ ofJson HourGlassManager::createHourGlassJson(const HourGlass & hourglass) const 
 	json["upLedId"] = hourglass.getUpLedId();
 	json["downLedId"] = hourglass.getDownLedId();
 	json["motorId"] = hourglass.getMotorId();
-	
+
 	// Add OSC configuration if OSC Out is configured
 	if (hourglass.isOSCOutEnabled()) {
 		auto oscOut = hourglass.getOSCOut();
 		if (oscOut) {
 			ofJson oscConfig;
 			oscConfig["enabled"] = oscOut->isEnabled();
-			
+
 			// Save destinations
 			auto destinations = oscOut->getDestinations();
 			if (!destinations.empty()) {
 				oscConfig["destinations"] = ofJson::array();
-				for (const auto& dest : destinations) {
+				for (const auto & dest : destinations) {
 					ofJson destJson;
 					destJson["name"] = dest.name;
 					destJson["ip"] = dest.ip;
@@ -252,62 +231,53 @@ ofJson HourGlassManager::createHourGlassJson(const HourGlass & hourglass) const 
 					oscConfig["destinations"].push_back(destJson);
 				}
 			}
-			
+
 			json["oscOut"] = oscConfig;
 		}
 	}
-	
+
 	return json;
 }
 
 bool HourGlassManager::parseHourGlassJson(const ofJson & json) {
 	try {
-		ofLogNotice("HourGlassManager") << "🔍 Parsing hourglass JSON entry...";
 
 		if (!json.contains("name")) {
 			ofLogError("HourGlassManager") << "❌ Missing 'name' field in hourglass JSON";
 			return false;
 		}
 		std::string name = json["name"];
-		ofLogNotice("HourGlassManager") << "📝 Found name: " << name;
 
 		if (!json.contains("upLedId")) {
 			ofLogError("HourGlassManager") << "❌ Missing 'upLedId' field in hourglass JSON";
 			return false;
 		}
 		int upLedId = json["upLedId"];
-		ofLogNotice("HourGlassManager") << "⬆️ Found upLedId: " << upLedId;
 
 		if (!json.contains("downLedId")) {
 			ofLogError("HourGlassManager") << "❌ Missing 'downLedId' field in hourglass JSON";
 			return false;
 		}
 		int downLedId = json["downLedId"];
-		ofLogNotice("HourGlassManager") << "⬇️ Found downLedId: " << downLedId;
 
 		if (!json.contains("motorId")) {
 			ofLogError("HourGlassManager") << "❌ Missing 'motorId' field in hourglass JSON";
 			return false;
 		}
 		int motorId = json["motorId"];
-		ofLogNotice("HourGlassManager") << "🔧 Found motorId: " << motorId;
-
-		ofLogNotice("HourGlassManager") << "🎯 Creating HourGlass from JSON: " << name
-										<< " (UpLED:" << upLedId << ", DownLED:" << downLedId << ", Motor:" << motorId << ")";
 
 		addHourGlass(name, upLedId, downLedId, motorId);
-		
+
 		// Setup OSC Out if configuration exists
 		if (json.contains("oscOut")) {
-			ofLogNotice("HourGlassManager") << "📡 Setting up OSC Out for: " << name;
+
 			auto hg = getHourGlass(name);
 			if (hg) {
 				hg->setupOSCOutFromJson(json["oscOut"]);
 				hg->enableOSCOut(true);
-				ofLogNotice("HourGlassManager") << "✅ OSC Out configured for: " << name;
 			}
 		}
-		
+
 		return true;
 
 	} catch (const std::exception & e) {

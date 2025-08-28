@@ -58,8 +58,6 @@ void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl) {
 
 	// CRITICAL FIX: Set up initial UI panel bindings for the first hourglass
 	updateUIPanelsBinding();
-
-	ofLogNotice("UIWrapper") << "Setup complete with " << hourglassManager->getHourGlassCount() << " hourglasses";
 }
 
 void UIWrapper::update() {
@@ -296,13 +294,6 @@ void UIWrapper::setupListeners() {
 	if (hourglassManager->getHourGlassCount() > 0) {
 		// Disable ofxOscParameterSync for now, use OSCController for everything
 		// oscSync.setup(hg->getParameterGroup(), 9000, "localhost", 9001);
-		ofLogNotice("UIWrapper") << "Using OSCController only - all OSC on port 8000";
-
-		// Log simple OSC addresses for RGB control
-		ofLogNotice("OSC Addresses") << "RGB Color control addresses (port 8000):";
-		ofLogNotice("OSC Addresses") << "  /rgb [r] [g] [b]           - Set both LEDs";
-		ofLogNotice("OSC Addresses") << "  /up/rgb [r] [g] [b]        - Set upper LED";
-		ofLogNotice("OSC Addresses") << "  /down/rgb [r] [g] [b]      - Set lower LED";
 
 		// NOTE: Parameter listeners will be set up by updateListenersForCurrentHourglass()
 	}
@@ -436,7 +427,6 @@ void UIWrapper::handleHourGlassSelection(int key) {
 		if (selection < hourglassManager->getHourGlassCount()) {
 			currentHourGlass = selection;
 			hourglassSelectorParam = currentHourGlass + 1; // Update GUI
-			ofLogNotice("UIWrapper") << "Selected HourGlass: " << (currentHourGlass + 1);
 		}
 	}
 }
@@ -445,11 +435,11 @@ void UIWrapper::handleConnectionCommands(int key) {
 	switch (key) {
 	case 'c': // Connect all
 		hourglassManager->connectAll();
-		ofLogNotice("UIWrapper") << "Connecting all hourglasses";
+
 		break;
 	case 'x': // Disconnect all
 		hourglassManager->disconnectAll();
-		ofLogNotice("UIWrapper") << "Disconnected all hourglasses";
+
 		break;
 	}
 }
@@ -463,27 +453,27 @@ void UIWrapper::handleMotorCommands(int key) {
 	switch (key) {
 	case 'u': // Move motor up
 		hg->commandRelativeMove(1000); // Example steps
-		ofLogNotice("UIWrapper") << "Key U: Commanded relative move up for " << hg->getName();
+
 		break;
 	case 'd': // Move motor down
 		hg->commandRelativeMove(-1000); // Example steps
-		ofLogNotice("UIWrapper") << "Key D: Commanded relative move down for " << hg->getName();
+
 		break;
 	case OF_KEY_LEFT:
 		hg->commandRelativeAngle(-45.0f);
-		ofLogNotice("UIWrapper") << "Key Left: Commanded relative angle -45 for " << hg->getName();
+
 		break;
 	case OF_KEY_RIGHT:
 		hg->commandRelativeAngle(45.0f);
-		ofLogNotice("UIWrapper") << "Key Right: Commanded relative angle +45 for " << hg->getName();
+
 		break;
 	case OF_KEY_UP:
 		hg->commandRelativeAngle(180.0f);
-		ofLogNotice("UIWrapper") << "Key Up: Commanded relative angle 180 for " << hg->getName();
+
 		break;
 	case OF_KEY_DOWN:
 		hg->commandRelativeAngle(-180.0f);
-		ofLogNotice("UIWrapper") << "Key Down: Commanded relative angle -180 for " << hg->getName();
+
 		break;
 	}
 	// Ensure motorEnabled changes also call hg->motorEnabled.set() so applyMotorParameters picks it up.
@@ -514,10 +504,9 @@ void UIWrapper::handleViewToggle(int key) {
 	if (key == 'v') { // 'v' for view toggle
 		if (currentViewMode == DETAILED_VIEW) {
 			currentViewMode = MINIMAL_VIEW;
-			ofLogNotice("UIWrapper") << "Switched to Minimal View";
+
 		} else {
 			currentViewMode = DETAILED_VIEW;
-			ofLogNotice("UIWrapper") << "Switched to Detailed View";
 		}
 	}
 }
@@ -525,7 +514,6 @@ void UIWrapper::handleViewToggle(int key) {
 // GUI Event Handlers
 void UIWrapper::hourglassSelectorChanged(int & selection) {
 	currentHourGlass = selection - 1;
-	ofLogNotice("UIWrapper") << "Selected HourGlass: " << selection;
 
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg) {
@@ -624,8 +612,6 @@ void UIWrapper::updateUIPanelsBinding() {
 
 	// Update listeners for the newly selected hourglass (for parameters directly from HourGlass)
 	updateListenersForCurrentHourglass();
-
-	ofLogNotice("UIWrapper") << "UI panels rebound to HourGlass " << (currentHourGlass + 1) << ": " << hg->getName();
 }
 
 void UIWrapper::updateListenersForCurrentHourglass() {
@@ -668,12 +654,10 @@ void UIWrapper::updateListenersForCurrentHourglass() {
 
 void UIWrapper::onConnectPressed() {
 	hourglassManager->connectAll();
-	ofLogNotice("UIWrapper") << "Connect All pressed";
 }
 
 void UIWrapper::onDisconnectPressed() {
 	hourglassManager->disconnectAll();
-	ofLogNotice("UIWrapper") << "Disconnect All pressed";
 }
 
 void UIWrapper::onEmergencyStopPressed() {
@@ -681,7 +665,6 @@ void UIWrapper::onEmergencyStopPressed() {
 	if (hg && hg->isConnected()) {
 		hg->emergencyStop(); // This can remain direct as it's an immediate action
 		hg->motorEnabled.set(false); // Update the parameter state
-		ofLogNotice("UIWrapper") << "Emergency Stop pressed for " << hg->getName();
 	}
 }
 
@@ -689,7 +672,6 @@ void UIWrapper::onSetZeroPressed() {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && hg->isConnected()) {
 		hg->setMotorZero(); // Use HourGlass method (handles OSC output)
-		ofLogNotice("UIWrapper") << "Set Zero for " << hg->getName();
 	}
 }
 
@@ -699,7 +681,6 @@ void UIWrapper::onMoveRelativePressed() {
 		// Use the UI's current values for speed/accel from ofParameters if not overridden
 		// The command methods now take std::optional for speed/accel
 		hg->commandRelativeMove(relativePositionParam.get());
-		ofLogNotice("UIWrapper") << "Commanded Relative Move: " << relativePositionParam.get() << " for " << hg->getName();
 	}
 }
 
@@ -707,7 +688,6 @@ void UIWrapper::onMoveAbsolutePressed() {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && hg->isConnected()) {
 		hg->commandAbsoluteMove(absolutePositionParam.get());
-		ofLogNotice("UIWrapper") << "Commanded Absolute Move: " << absolutePositionParam.get() << " for " << hg->getName();
 	}
 }
 
@@ -715,7 +695,6 @@ void UIWrapper::onMoveRelativeAnglePressed() {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && hg->isConnected()) {
 		hg->commandRelativeAngle(static_cast<float>(relativeAngleParam.get()));
-		ofLogNotice("UIWrapper") << "Commanded Relative Angle: " << relativeAngleParam.get() << " for " << hg->getName();
 	}
 }
 
@@ -723,12 +702,10 @@ void UIWrapper::onMoveAbsoluteAnglePressed() {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && hg->isConnected()) {
 		hg->commandAbsoluteAngle(static_cast<float>(absoluteAngleParam.get()));
-		ofLogNotice("UIWrapper") << "Commanded Absolute Angle: " << absoluteAngleParam.get() << " for " << hg->getName();
 	}
 }
 
 void UIWrapper::syncColorsChanged(bool & enabled) {
-	ofLogNotice("UIWrapper") << "Sync Colors: " << (enabled ? "ON" : "OFF");
 }
 
 void UIWrapper::onAllOffPressed() {
@@ -754,8 +731,6 @@ void UIWrapper::onAllOffPressed() {
 		hg->upPwm.set(0);
 		hg->downPwm.set(0);
 
-		ofLogNotice("UIWrapper") << "ALL OFF - All parameters set to 0 (RGB, Main LEDs, PWM)";
-
 		// Update last colors
 		lastUpColor = ofColor::black;
 		lastDownColor = ofColor::black;
@@ -772,10 +747,9 @@ void UIWrapper::onLedsOffPressed() {
 		if (syncColorsParam.get()) {
 			hg->upLedColor.set(ofColor::black);
 			hg->downLedColor.set(ofColor::black);
-			ofLogNotice("UIWrapper") << "LEDs Off - BOTH LEDs set to black";
+
 		} else {
 			hg->upLedColor.set(ofColor::black);
-			ofLogNotice("UIWrapper") << "LEDs Off - UP LED set to black";
 		}
 	}
 }
@@ -797,10 +771,9 @@ void UIWrapper::onMotorEnabledChanged(bool & enabled) {
 		// Apply motor enable/disable to hardware
 		if (enabled) {
 			hg->enableMotor();
-			ofLogNotice("UIWrapper") << "⚡ UI: Motor enabled for hourglass " << (currentHourGlass + 1);
+
 		} else {
 			hg->disableMotor();
-			ofLogNotice("UIWrapper") << "⚡ UI: Motor disabled for hourglass " << (currentHourGlass + 1);
 		}
 	}
 }
@@ -810,14 +783,12 @@ void UIWrapper::onMicrostepChanged(int & value) {
 	if (hg && hg->isConnected() && !hg->updatingFromOSC) {
 		// Apply microstep change to hardware
 		hg->applyMotorParameters();
-		ofLogNotice("UIWrapper") << "🔧 UI: Microstep changed to " << value << " for hourglass " << (currentHourGlass + 1);
 	}
 }
 
 void UIWrapper::onMotorSpeedChanged(int & value) {
 	// Motor speed is just a parameter for the next movement command
 	// No immediate hardware command needed
-	ofLogNotice("UIWrapper") << "UI: Motor speed parameter set to " << value << " for hourglass " << (currentHourGlass + 1);
 }
 
 void UIWrapper::onMotorAccelerationChanged(int & value) {
@@ -827,7 +798,6 @@ void UIWrapper::onMotorAccelerationChanged(int & value) {
 	if (hg && hg->isConnected() && !hg->updatingFromOSC) {
 		hg->applyMotorParameters(); // This will now use the int acceleration value
 	}
-	ofLogNotice("UIWrapper") << "UI: Motor acceleration parameter set to " << value << " for hourglass " << (currentHourGlass + 1);
 }
 
 void UIWrapper::onGearRatioChanged(float & value) {
@@ -1037,7 +1007,6 @@ void UIWrapper::loadHourGlassFromXml(const ofXml & hgNode, HourGlass * hg, int h
 
 // XML save/load for persistence
 void UIWrapper::saveSettings() {
-	ofLogNotice("UIWrapper") << "💾 Saving settings for all hourglasses...";
 
 	// === Save UI State (current selection, global settings) ===
 	ofXml uiStateConfig;
@@ -1064,12 +1033,9 @@ void UIWrapper::saveSettings() {
 	settingsPanel.saveToFile("settings_actions.xml");
 	luminosityPanel.saveToFile("luminosity.xml");
 	effectsPanel.saveToFile("effects.xml");
-
-	ofLogNotice("UIWrapper") << "💾 Settings saved: " << hourglassManager->getHourGlassCount() << " hourglasses, current selection: " << (currentHourGlass + 1);
 }
 
 void UIWrapper::loadSettings() {
-	ofLogNotice("UIWrapper") << "📂 Loading settings for all hourglasses...";
 
 	// === Load UI State (selection, global settings) ===
 	ofXml uiStateConfig;
@@ -1093,7 +1059,6 @@ void UIWrapper::loadSettings() {
 				isInternallySyncing = true; // Prevent listener from firing
 				hourglassSelectorParam.set(currentHourGlass + 1);
 				isInternallySyncing = false;
-				ofLogNotice("UIWrapper") << "📂 Restored hourglass selection: " << (currentHourGlass + 1);
 			}
 		}
 	}
@@ -1110,7 +1075,6 @@ void UIWrapper::loadSettings() {
 					auto * hg = hourglassManager->getHourGlass(index);
 					if (hg) {
 						loadHourGlassFromXml(node, hg, index); // Use helper function
-						ofLogNotice("UIWrapper") << "📂 Loaded settings for HG " << (index + 1) << ": " << hg->getName();
 					}
 				}
 			}
@@ -1126,7 +1090,6 @@ void UIWrapper::loadSettings() {
 	updateUIPanelsBinding();
 
 	// The individual luminosity slider is already updated within updateUIPanelsBinding
-	ofLogNotice("UIWrapper") << "📂 Settings loaded for " << hourglassManager->getHourGlassCount() << " hourglasses, current selection: " << (currentHourGlass + 1);
 }
 
 // Implement the new listener method
@@ -1158,7 +1121,6 @@ void UIWrapper::updateGlobalLuminositySlider(float luminosity) {
 	globalLuminosityParam.removeListener(this, &UIWrapper::onGlobalLuminosityChanged);
 	globalLuminosityParam.set(luminosity);
 	globalLuminosityParam.addListener(this, &UIWrapper::onGlobalLuminosityChanged);
-	ofLogNotice("UIWrapper") << "Global luminosity slider updated to: " << luminosity;
 }
 
 void UIWrapper::updateCurrentIndividualLuminositySlider(float luminosity) {
@@ -1334,7 +1296,7 @@ void UIWrapper::updateDownLedArcFromOSC(int value) {
 }
 
 void UIWrapper::onSetZeroAllPressed() {
-	ofLogNotice("UIWrapper") << "Set Zero ALL Motors pressed";
+
 	if (hourglassManager) {
 		for (int i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
 			HourGlass * hg = hourglassManager->getHourGlass(i);

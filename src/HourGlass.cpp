@@ -47,7 +47,6 @@ HourGlass::HourGlass(const std::string & name)
 	, upEffectsManager()
 	, downEffectsManager()
 	, oscOutController(nullptr) {
-	ofLogNotice("HourGlass") << "🏗️ Constructing HourGlass: " << name;
 
 	// Add parameters to the group
 	params.add(motorEnabled);
@@ -82,12 +81,6 @@ void HourGlass::configure(const std::string & serialPort, int baudRate,
 	this->upLedId = upLedId;
 	this->downLedId = downLedId;
 	this->motorId = motorId;
-
-	ofLogNotice("HourGlass") << "Configured " << name
-							 << " - Port: " << serialPort
-							 << " - UpLED:" << upLedId
-							 << " - DownLED:" << downLedId
-							 << " - Motor:" << motorId;
 }
 
 bool HourGlass::connect() {
@@ -113,7 +106,6 @@ bool HourGlass::connect() {
 	setupControllers();
 	connected = true;
 
-	ofLogNotice("HourGlass") << name << " connected to " << serialPortName;
 	return true;
 }
 
@@ -132,8 +124,6 @@ void HourGlass::disconnect() {
 
 		sharedSerialPort.reset();
 		connected = false;
-
-		ofLogNotice("HourGlass") << name << " disconnected";
 	}
 }
 
@@ -166,7 +156,6 @@ void HourGlass::setupOSCOut(const std::string & configPath) {
 	}
 
 	oscOutController->setup();
-	ofLogNotice("HourGlass") << name << " - OSC Out configured";
 }
 
 void HourGlass::setupOSCOutFromJson(const ofJson & oscConfig) {
@@ -175,14 +164,11 @@ void HourGlass::setupOSCOutFromJson(const ofJson & oscConfig) {
 	}
 
 	oscOutController->loadConfigurationFromJson(oscConfig);
-
-	ofLogNotice("HourGlass") << name << " - OSC Out configured from JSON";
 }
 
 void HourGlass::enableOSCOut(bool enabled) {
 	if (oscOutController) {
 		oscOutController->setEnabled(enabled);
-		ofLogNotice("HourGlass") << name << " - OSC Out " << (enabled ? "enabled" : "disabled");
 	}
 }
 
@@ -195,21 +181,18 @@ void HourGlass::enableMotor() {
 	if (connected && motor) {
 		motor->enable();
 	}
-	ofLogNotice("HourGlass") << name << " - Motor enabled";
 }
 
 void HourGlass::disableMotor() {
 	if (connected && motor) {
 		motor->disable();
 	}
-	ofLogNotice("HourGlass") << name << " - Motor disabled";
 }
 
 void HourGlass::emergencyStop() {
 	if (connected && motor) {
 		motor->emergencyStop();
 	}
-	ofLogNotice("HourGlass") << name << " - Emergency stop";
 
 	// Send OSC message if not updating from OSC (avoid feedback loops)
 	if (isOSCOutEnabled() && !updatingFromOSC) {
@@ -255,7 +238,7 @@ void HourGlass::applyMotorParameters() {
 
 	// Send OSC message for microstep if not updating from OSC
 	if (isOSCOutEnabled() && !updatingFromOSC) {
-		oscOutController->sendMotorUstep(motorId, microstep.get());
+		//oscOutController->sendMotorUstep(motorId, microstep.get());
 	}
 
 	// Determine speed and acceleration to use for pending commands
@@ -265,7 +248,6 @@ void HourGlass::applyMotorParameters() {
 
 	// Execute pending commands
 	if (executeRelativeMove) {
-		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing relative move: " << targetRelativeSteps;
 
 		// Send to serial motor if available
 		if (hasSerialMotor) {
@@ -281,7 +263,6 @@ void HourGlass::applyMotorParameters() {
 		executeRelativeMove = false;
 	}
 	if (executeAbsoluteMove) {
-		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing absolute move to: " << targetAbsolutePosition;
 
 		// Send to serial motor if available
 		if (hasSerialMotor) {
@@ -297,7 +278,6 @@ void HourGlass::applyMotorParameters() {
 		executeAbsoluteMove = false;
 	}
 	if (executeRelativeAngle) {
-		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing relative angle: " << targetRelativeDegrees;
 
 		// Send to serial motor if available
 		if (hasSerialMotor) {
@@ -311,7 +291,6 @@ void HourGlass::applyMotorParameters() {
 		executeRelativeAngle = false;
 	}
 	if (executeAbsoluteAngle) {
-		ofLogNotice("HourGlass::applyMotorParams") << getName() << " - Executing absolute angle to: " << targetAbsoluteDegrees;
 
 		// Send to serial motor if available
 		if (hasSerialMotor) {
@@ -474,7 +453,6 @@ void HourGlass::commandRelativeMove(int steps, std::optional<int> speed, std::op
 	pendingMoveSpeed = speed;
 	pendingMoveAccel = accel;
 	executeRelativeMove = true;
-	ofLogNotice("HourGlass::command") << getName() << " - Relative move commanded: " << steps << " steps.";
 }
 
 void HourGlass::commandAbsoluteMove(int position, std::optional<int> speed, std::optional<int> accel) {
@@ -482,7 +460,6 @@ void HourGlass::commandAbsoluteMove(int position, std::optional<int> speed, std:
 	pendingMoveSpeed = speed;
 	pendingMoveAccel = accel;
 	executeAbsoluteMove = true;
-	ofLogNotice("HourGlass::command") << getName() << " - Absolute move commanded to: " << position;
 }
 
 void HourGlass::commandRelativeAngle(float degrees, std::optional<int> speed, std::optional<int> accel) {
@@ -490,7 +467,6 @@ void HourGlass::commandRelativeAngle(float degrees, std::optional<int> speed, st
 	pendingMoveSpeed = speed;
 	pendingMoveAccel = accel;
 	executeRelativeAngle = true;
-	ofLogNotice("HourGlass::command") << getName() << " - Relative angle commanded: " << degrees << " deg.";
 }
 
 void HourGlass::commandAbsoluteAngle(float degrees, std::optional<int> speed, std::optional<int> accel) {
@@ -498,14 +474,12 @@ void HourGlass::commandAbsoluteAngle(float degrees, std::optional<int> speed, st
 	pendingMoveSpeed = speed;
 	pendingMoveAccel = accel;
 	executeAbsoluteAngle = true;
-	ofLogNotice("HourGlass::command") << getName() << " - Absolute angle commanded to: " << degrees << " deg.";
 }
 
 void HourGlass::setMotorZero() {
 	if (connected && motor) {
 		motor->setZero();
 	}
-	ofLogNotice("HourGlass") << name << " - Motor zero set";
 
 	// Send OSC message if not updating from OSC (avoid feedback loops)
 	if (isOSCOutEnabled() && !updatingFromOSC) {

@@ -4,17 +4,14 @@
 OSCOutController::OSCOutController()
 	: enabled(true)
 	, sentMessageCount(0) {
-	ofLogNotice("OSCOutController") << "🚀 OSC Out Controller initialized";
 }
 
 OSCOutController::~OSCOutController() {
 	senders.clear();
-	ofLogNotice("OSCOutController") << "📤 OSC Out Controller destroyed";
 }
 
 void OSCOutController::setup() {
 	loadConfiguration();
-	ofLogNotice("OSCOutController") << "✅ OSC Out Controller setup complete";
 }
 
 void OSCOutController::loadConfigurationFromJson(const ofJson & json) {
@@ -28,9 +25,6 @@ void OSCOutController::loadConfigurationFromJson(const ofJson & json) {
 		if (json.contains("destinations")) {
 			loadDestinationsFromJson(json["destinations"]);
 		}
-
-		ofLogNotice("OSCOutController") << "📋 Loaded configuration from JSON";
-		ofLogNotice("OSCOutController") << "📡 Configured " << destinations.size() << " destinations";
 
 	} catch (const std::exception & e) {
 		ofLogError("OSCOutController") << "Failed to load config from JSON: " << e.what();
@@ -64,9 +58,6 @@ void OSCOutController::loadConfiguration(const std::string & configPath) {
 			loadDestinationsFromJson(json["destinations"]);
 		}
 
-		ofLogNotice("OSCOutController") << "📋 Loaded configuration from: " << configPath;
-		ofLogNotice("OSCOutController") << "📡 Configured " << destinations.size() << " destinations";
-
 	} catch (const std::exception & e) {
 		ofLogError("OSCOutController") << "Failed to load config: " << e.what();
 		// Fall back to default config
@@ -81,7 +72,6 @@ void OSCOutController::saveConfiguration(const std::string & configPath) {
 		json["destinations"] = destinationsToJson();
 
 		ofSaveJson(configPath, json);
-		ofLogNotice("OSCOutController") << "💾 Saved configuration to: " << configPath;
 
 	} catch (const std::exception & e) {
 		ofLogError("OSCOutController") << "Failed to save config: " << e.what();
@@ -100,9 +90,6 @@ void OSCOutController::addDestination(const std::string & name, const std::strin
 
 	destinations.push_back(dest);
 	ensureSenderExists(dest);
-
-	ofLogNotice("OSCOutController") << "➕ Added destination: " << name
-									<< " (" << ip << ":" << port << ")";
 }
 
 void OSCOutController::removeDestination(const std::string & name) {
@@ -112,7 +99,6 @@ void OSCOutController::removeDestination(const std::string & name) {
 	if (it != destinations.end()) {
 		destinations.erase(it, destinations.end());
 		senders.erase(name);
-		ofLogNotice("OSCOutController") << "➖ Removed destination: " << name;
 	}
 }
 
@@ -120,8 +106,7 @@ void OSCOutController::setDestinationEnabled(const std::string & name, bool enab
 	for (auto & dest : destinations) {
 		if (dest.name == name) {
 			dest.enabled = enabled;
-			ofLogNotice("OSCOutController") << "🔄 Destination " << name
-											<< (enabled ? " enabled" : " disabled");
+
 			break;
 		}
 	}
@@ -139,7 +124,6 @@ void OSCOutController::sendMotorZero(int deviceId) {
 	msg.setAddress("/motor/zero");
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "🔄 Sent motor zero command";
 }
 
 void OSCOutController::sendMotorHoming(int deviceId) {
@@ -149,7 +133,6 @@ void OSCOutController::sendMotorHoming(int deviceId) {
 	msg.setAddress("/motor/homing");
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "🏠 Sent motor homing command";
 }
 
 void OSCOutController::sendMotorEmergency(int deviceId) {
@@ -159,7 +142,6 @@ void OSCOutController::sendMotorEmergency(int deviceId) {
 	msg.setAddress("/motor/emergency");
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "🚨 Sent motor emergency stop command";
 }
 
 void OSCOutController::sendMotorUstep(int deviceId, int ustepValue) {
@@ -173,7 +155,6 @@ void OSCOutController::sendMotorUstep(int deviceId, int ustepValue) {
 	msg.addInt32Arg(ustepValue);
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "⚙️ Sent motor ustep: " << ustepValue;
 }
 
 void OSCOutController::sendMotorRelative(int deviceId, float speedRotMin, float accDegPerS2, float moveDeg) {
@@ -186,8 +167,6 @@ void OSCOutController::sendMotorRelative(int deviceId, float speedRotMin, float 
 	msg.addFloatArg(moveDeg);
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "🔄 Sent motor relative: speed=" << speedRotMin
-									<< " acc=" << accDegPerS2 << " move=" << moveDeg << "°";
 }
 
 void OSCOutController::sendMotorRelativeStop(int deviceId, float accDegPerS2) {
@@ -198,7 +177,6 @@ void OSCOutController::sendMotorRelativeStop(int deviceId, float accDegPerS2) {
 	msg.addFloatArg(accDegPerS2);
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "⏹️ Sent motor relative stop: acc=" << accDegPerS2;
 }
 
 void OSCOutController::sendMotorAbsolute(int deviceId, float speedRotMin, float accDegPerS2, float moveDeg) {
@@ -211,8 +189,6 @@ void OSCOutController::sendMotorAbsolute(int deviceId, float speedRotMin, float 
 	msg.addFloatArg(moveDeg);
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "📍 Sent motor absolute: speed=" << speedRotMin
-									<< " acc=" << accDegPerS2 << " move=" << moveDeg << "°";
 }
 
 void OSCOutController::sendMotorAbsoluteStop(int deviceId, float accDegPerS2) {
@@ -223,7 +199,6 @@ void OSCOutController::sendMotorAbsoluteStop(int deviceId, float accDegPerS2) {
 	msg.addFloatArg(accDegPerS2);
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "⏹️ Sent motor absolute stop: acc=" << accDegPerS2;
 }
 
 // Electromagnet control messages
@@ -235,7 +210,6 @@ void OSCOutController::sendMagnet(const std::string & position, int pwmValue) {
 	msg.addInt32Arg(pwmValue);
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "🧲 Sent magnet PWM to " << position << ": " << pwmValue;
 }
 
 // Power LED control messages
@@ -247,7 +221,6 @@ void OSCOutController::sendPowerLED(const std::string & position, int pwmValue) 
 	msg.addInt32Arg(pwmValue);
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "💡 Sent power LED PWM to " << position << ": " << pwmValue;
 }
 
 // RGB LED circle control messages
@@ -264,9 +237,6 @@ void OSCOutController::sendRGBLED(const std::string & position, uint8_t red, uin
 	msg.addInt32Arg(arcDeg);
 
 	sendMessageToAll(msg);
-	ofLogNotice("OSCOutController") << "🌈 Sent RGB LED to " << position
-									<< ": RGBA(" << (int)red << "," << (int)green << "," << (int)blue << "," << (int)alpha << ") "
-									<< "origin=" << originDeg << "° arc=" << arcDeg << "°";
 }
 
 void OSCOutController::sendRGBLED(const std::string & position, const ofColor & color, uint8_t alpha, int originDeg, int arcDeg) {
@@ -279,9 +249,6 @@ void OSCOutController::ensureSenderExists(const OSCDestination & dest) {
 		auto sender = std::unique_ptr<ofxOscSender>(new ofxOscSender());
 		sender->setup(dest.ip, dest.port);
 		senders[dest.name] = std::move(sender);
-
-		ofLogNotice("OSCOutController") << "🔌 Created OSC sender for " << dest.name
-										<< " (" << dest.ip << ":" << dest.port << ")";
 	}
 }
 
@@ -324,9 +291,14 @@ void OSCOutController::loadDestinationsFromJson(const ofJson & json) {
 	destinations.clear();
 
 	for (const auto & destJson : json) {
-		if (destJson.contains("name") && destJson.contains("ip") && destJson.contains("port")) {
+		if (destJson.contains("ip") && destJson.contains("port")) {
 			OSCDestination dest;
-			dest.name = destJson["name"];
+			// Auto-generate name if not provided
+			if (destJson.contains("name")) {
+				dest.name = destJson["name"];
+			} else {
+				dest.name = destJson["ip"].get<std::string>() + ":" + std::to_string(destJson["port"].get<int>());
+			}
 			dest.ip = destJson["ip"];
 			dest.port = destJson["port"];
 			dest.enabled = destJson.value("enabled", true);
