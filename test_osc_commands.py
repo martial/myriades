@@ -78,6 +78,79 @@ class OSCTester:
         address = "/blackout"
         self.client.send_message(address, [])
         print(f"Sent: {address}")
+    
+    # Motor commands
+    def send_motor_enable(self, hourglass_id, enable):
+        """Enable/disable motor"""
+        address = f"/hourglass/{hourglass_id}/motor/enable"
+        self.client.send_message(address, [bool(enable)])
+        print(f"Sent: {address} {enable}")
+    
+    def send_motor_speed(self, hourglass_id, speed):
+        """Set motor speed"""
+        address = f"/hourglass/{hourglass_id}/motor/speed"
+        self.client.send_message(address, [int(speed)])
+        print(f"Sent: {address} {speed}")
+    
+    def send_motor_acceleration(self, hourglass_id, accel):
+        """Set motor acceleration"""
+        address = f"/hourglass/{hourglass_id}/motor/acceleration"
+        self.client.send_message(address, [int(accel)])
+        print(f"Sent: {address} {accel}")
+    
+    def send_motor_microstep(self, hourglass_id, microstep):
+        """Set motor microstep"""
+        address = f"/hourglass/{hourglass_id}/motor/microstep"
+        self.client.send_message(address, [int(microstep)])
+        print(f"Sent: {address} {microstep}")
+    
+    def send_motor_rotate(self, hourglass_id, degrees, speed=None, accel=None):
+        """Rotate motor relative degrees"""
+        address = f"/hourglass/{hourglass_id}/motor/rotate"
+        args = [float(degrees)]
+        if speed is not None:
+            args.append(int(speed))
+        if accel is not None:
+            args.append(int(accel))
+        self.client.send_message(address, args)
+        args_str = " ".join(map(str, args))
+        print(f"Sent: {address} {args_str}")
+    
+    def send_motor_position(self, hourglass_id, degrees, speed=None, accel=None):
+        """Move motor to absolute position"""
+        address = f"/hourglass/{hourglass_id}/motor/position"
+        args = [float(degrees)]
+        if speed is not None:
+            args.append(int(speed))
+        if accel is not None:
+            args.append(int(accel))
+        self.client.send_message(address, args)
+        args_str = " ".join(map(str, args))
+        print(f"Sent: {address} {args_str}")
+    
+    def send_motor_zero(self, hourglass_id):
+        """Set motor zero position"""
+        address = f"/hourglass/{hourglass_id}/motor/set_zero"
+        self.client.send_message(address, [])
+        print(f"Sent: {address}")
+    
+    def send_motor_stop(self, hourglass_id):
+        """Emergency stop motor"""
+        address = f"/hourglass/{hourglass_id}/motor/emergency_stop"
+        self.client.send_message(address, [])
+        print(f"Sent: {address}")
+    
+    def send_motor_stop_all(self):
+        """Emergency stop all motors"""
+        address = "/system/emergency_stop_all"
+        self.client.send_message(address, [])
+        print(f"Sent: {address}")
+    
+    def send_motor_zero_all(self):
+        """Set zero for all motors"""
+        address = "/system/motor/set_zero_all"
+        self.client.send_message(address, [])
+        print(f"Sent: {address}")
 
 def main():
     # Initialize OSC client
@@ -152,6 +225,19 @@ def interactive_mode():
     print("  lum <hg> <value>         - Set individual luminosity 0-1 (e.g: lum 1 0.5)")
     print("  global <value>           - Set global luminosity 0-1 (e.g: global 0.8)")
     print("  blackout                 - Global blackout")
+    print("")
+    print("Motor Commands:")
+    print("  motor <hg> enable <0/1>  - Enable/disable motor (e.g: motor 1 enable 1)")
+    print("  motor <hg> speed <val>   - Set motor speed 0-500 (e.g: motor 1 speed 100)")
+    print("  motor <hg> accel <val>   - Set acceleration 0-255 (e.g: motor 1 accel 128)")
+    print("  motor <hg> microstep <val> - Set microstep 1-256 (e.g: motor 1 microstep 16)")
+    print("  motor <hg> rotate <deg> [speed] [accel] - Rotate relative degrees")
+    print("  motor <hg> position <deg> [speed] [accel] - Move to absolute position")
+    print("  motor <hg> zero          - Set current position as zero")
+    print("  motor <hg> stop          - Emergency stop")
+    print("  motor all stop           - Emergency stop all motors")
+    print("  motor all zero           - Set zero for all motors")
+    print("")
     print("  help                     - Show this help")
     print("  demo                     - Run quick demo")
     print("  quit                     - Exit")
@@ -180,7 +266,9 @@ def interactive_mode():
                 print("  demo                     - Run quick demo")
                 print("  quit                     - Exit")
             elif cmd[0] == "demo":
-                print("Running demo...")
+                print("Running LED and motor demo...")
+                # LED Demo
+                print("LED Demo:")
                 osc.send_led_all_rgb(1, 255, 0, 0)
                 time.sleep(0.5)
                 osc.send_led_all_rgb(1, 0, 255, 0)
@@ -188,6 +276,21 @@ def interactive_mode():
                 osc.send_led_all_rgb(1, 0, 0, 255)
                 time.sleep(0.5)
                 osc.send_led_all_rgb(1, 255, 255, 255)
+                
+                # Motor Demo
+                print("Motor Demo:")
+                time.sleep(1)
+                osc.send_motor_enable(1, 1)  # Enable motor
+                time.sleep(0.5)
+                osc.send_motor_speed(1, 50)  # Set speed
+                time.sleep(0.5)
+                osc.send_motor_rotate(1, 90.0)  # Rotate 90 degrees
+                time.sleep(2)
+                osc.send_motor_rotate(1, -90.0)  # Rotate back
+                time.sleep(2)
+                osc.send_motor_zero(1)  # Set zero position
+                time.sleep(0.5)
+                osc.send_motor_enable(1, 0)  # Disable motor
                 print("Demo complete!")
             elif cmd[0] == "rgb" and len(cmd) == 5:
                 osc.send_led_all_rgb(cmd[1], int(cmd[2]), int(cmd[3]), int(cmd[4]))
@@ -207,6 +310,49 @@ def interactive_mode():
                 osc.send_global_luminosity(float(cmd[2]))
             elif cmd[0] == "blackout":
                 osc.send_blackout()
+            elif cmd[0] == "motor":
+                if len(cmd) < 3:
+                    print("Motor command requires at least 2 arguments. Type 'help' for usage.")
+                elif cmd[1] == "all":
+                    if cmd[2] == "stop":
+                        osc.send_motor_stop_all()
+                    elif cmd[2] == "zero":
+                        osc.send_motor_zero_all()
+                    else:
+                        print("Invalid motor all command. Use: motor all stop OR motor all zero")
+                else:
+                    hourglass_id = cmd[1]
+                    motor_cmd = cmd[2]
+                    if motor_cmd == "enable" and len(cmd) == 4:
+                        osc.send_motor_enable(hourglass_id, int(cmd[3]))
+                    elif motor_cmd == "speed" and len(cmd) == 4:
+                        osc.send_motor_speed(hourglass_id, int(cmd[3]))
+                    elif motor_cmd == "accel" and len(cmd) == 4:
+                        osc.send_motor_acceleration(hourglass_id, int(cmd[3]))
+                    elif motor_cmd == "microstep" and len(cmd) == 4:
+                        osc.send_motor_microstep(hourglass_id, int(cmd[3]))
+                    elif motor_cmd == "rotate":
+                        if len(cmd) >= 4:
+                            degrees = float(cmd[3])
+                            speed = int(cmd[4]) if len(cmd) > 4 else None
+                            accel = int(cmd[5]) if len(cmd) > 5 else None
+                            osc.send_motor_rotate(hourglass_id, degrees, speed, accel)
+                        else:
+                            print("Rotate command requires degrees. Usage: motor <hg> rotate <degrees> [speed] [accel]")
+                    elif motor_cmd == "position":
+                        if len(cmd) >= 4:
+                            degrees = float(cmd[3])
+                            speed = int(cmd[4]) if len(cmd) > 4 else None
+                            accel = int(cmd[5]) if len(cmd) > 5 else None
+                            osc.send_motor_position(hourglass_id, degrees, speed, accel)
+                        else:
+                            print("Position command requires degrees. Usage: motor <hg> position <degrees> [speed] [accel]")
+                    elif motor_cmd == "zero":
+                        osc.send_motor_zero(hourglass_id)
+                    elif motor_cmd == "stop":
+                        osc.send_motor_stop(hourglass_id)
+                    else:
+                        print(f"Unknown motor command: {motor_cmd}. Type 'help' for usage.")
             else:
                 print("Invalid command or wrong number of arguments. Type 'help' for usage.")
         except KeyboardInterrupt:

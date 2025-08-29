@@ -144,11 +144,9 @@ void HourGlass::setupControllers() {
 	downLedMagnet.reset(new LedMagnetController());
 	downLedMagnet->setId(downLedId);
 
-	// Setup Motor Controller (only if serial port available)
-	if (sharedSerialPort) {
-		motor.reset(new MotorController(sharedSerialPort));
-		motor->setId(motorId);
-	}
+	// Setup Motor Controller (OSC-only mode, works without serial)
+	motor.reset(new MotorController(sharedSerialPort)); // sharedSerialPort peut être nullptr
+	motor->setId(motorId);
 }
 
 // OSC Out configuration methods

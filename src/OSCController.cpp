@@ -929,15 +929,7 @@ void OSCController::sendError(const string & originalAddress, const string & err
 }
 
 vector<string> OSCController::splitAddress(const string & address) {
-	// Check cache first
-	auto it = addressCache.find(address);
-	if (it != addressCache.end()) {
-		return it->second;
-	}
-
-	// Parse address
 	vector<string> parts;
-	parts.reserve(4); // Most OSC addresses have 2-4 parts, reserve capacity
 	string addr = address;
 	if (!addr.empty() && addr[0] == '/') addr = addr.substr(1);
 	size_t pos = 0;
@@ -946,12 +938,6 @@ vector<string> OSCController::splitAddress(const string & address) {
 		addr.erase(0, pos + 1);
 	}
 	if (!addr.empty()) parts.push_back(addr);
-
-	// Cache result (with size limit)
-	if (addressCache.size() < MAX_CACHE_SIZE) {
-		addressCache[address] = parts;
-	}
-
 	return parts;
 }
 
@@ -971,7 +957,6 @@ std::vector<int> OSCController::extractHourglassIds(const vector<string> & addre
 	std::string target = addressParts[1];
 
 	if (target == "all") {
-		ids.reserve(hourglassManager->getHourGlassCount()); // Reserve for all hourglasses
 		for (int i = 1; i <= (int)hourglassManager->getHourGlassCount(); i++) {
 			ids.push_back(i);
 		}

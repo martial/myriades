@@ -213,17 +213,10 @@ float MotorController::axisToDegrees(int axis, float gearRatio, float calibratio
 }
 
 bool MotorController::send(const std::vector<uint8_t> & data) {
-	if (!isConnected()) {
-		ofLogError("MotorController") << "Cannot send command: Not connected to device";
-		return false;
-	}
-
 	if (data.size() > 7) {
 		ofLogError("MotorController") << "Data too large (max 7 bytes): " << data.size();
 		return false;
 	}
-
-	std::vector<uint8_t> packet = buildPacket(data);
 
 	// Log what we're sending including motor device ID
 	std::string dataStr = "";
@@ -231,15 +224,20 @@ bool MotorController::send(const std::vector<uint8_t> & data) {
 		if (i > 0) dataStr += " ";
 		dataStr += std::to_string(static_cast<int>(data[i]));
 	}
-	ofLogNotice("MotorController") << "Sending to Motor ID " << id << ": [" << dataStr << "]";
+	ofLogNotice("MotorController") << "Motor ID " << id << " command processed for OSC-only: [" << dataStr << "]";
 
-	// Send entire packet at once instead of byte-by-byte for better performance
-	serialPort->writeBytes(packet.data(), packet.size());
+	// If we have a serial port, send the command
+	if (isConnected()) {
+		std::vector<uint8_t> packet = buildPacket(data);
 
-	// Notify SerialPortManager for statistics
-	SerialPortManager::getInstance().trackWrite(packet.size()); // Use existing trackWrite method
+		// Send entire packet at once instead of byte-by-byte for better performance
+		serialPort->writeBytes(packet.data(), packet.size());
 
-// Log the sent packet (only in debug mode to reduce overhead)
+		// Notify SerialPortManager for statistics
+		SerialPortManager::getInstance().trackWrite(packet.size()); // Use existing trackWrite method
+	}
+
+	// Log the sent packet (only in debug mode to reduce overhead)
 #ifdef DEBUG
 	std::string hexStr = "Motor sent: ";
 	for (size_t i = 0; i < packet.size(); i++) {
