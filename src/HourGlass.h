@@ -97,6 +97,14 @@ public:
 	float lastLedCommandSendTime;
 	static const float MIN_LED_COMMAND_INTERVAL_MS;
 
+	// Dirty flags for optimization
+	mutable bool ledParametersDirty = true;
+	mutable bool motorParametersDirty = true;
+
+	// Methods to mark parameters as dirty
+	void markLedParametersDirty() const { ledParametersDirty = true; }
+	void markMotorParametersDirty() const { motorParametersDirty = true; }
+
 	// Effects Management
 	void updateEffects(float deltaTime);
 	void addUpEffect(std::unique_ptr<Effect> effect);

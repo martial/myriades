@@ -6,6 +6,7 @@
 #include "ofxOsc.h"
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 // Forward declaration
@@ -63,6 +64,10 @@ private:
 
 	// Connection settings
 	int receivePort;
+
+	// Address parsing cache for performance
+	mutable std::unordered_map<std::string, std::vector<std::string>> addressCache;
+	static constexpr size_t MAX_CACHE_SIZE = 50; // Limit cache size
 
 	// Process last commands in main thread
 	void processLastCommands();

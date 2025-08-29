@@ -1,6 +1,5 @@
 #pragma once
 
-#include "SerialPortManager.h"
 #include "ofMain.h"
 #include <algorithm>
 #include <memory>
@@ -25,8 +24,8 @@ public:
 		PORT_IN_USE
 	};
 
-	// Constructor with dependency injection
-	explicit LedMagnetController(std::shared_ptr<ISerialPort> serialPort = nullptr);
+	// Constructor - OSC-only mode (serial removed)
+	LedMagnetController();
 	~LedMagnetController();
 
 	// Setup and connection
@@ -127,19 +126,18 @@ public:
 	// RGB optimization methods
 	static void initializeLUT();
 
-private:
-	std::shared_ptr<ISerialPort> serialPort;
-	std::string connectedPortName;
+	// Force reset of "last sent" values (fixes Main LED bug when switching hourglasses)
+	void resetLastSentValues();
 
-	// Protocol parameters
+private:
+	std::string connectedPortName; // Keep for reference only
+
+	// Device parameters
 	int id = 11;
 	bool ext = false;
 	bool rtr = false;
-	static constexpr uint8_t START_BYTE = 0xE7; // 231
-	static constexpr uint8_t END_BYTE = 0x7E; // 126
 
-	// Build protocol packet
-	std::vector<uint8_t> buildPacket(const std::vector<uint8_t> & data) const;
+	// Serial protocol constants removed (no longer needed)
 
 	// Helper to clamp values
 	template <typename T>

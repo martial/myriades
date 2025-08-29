@@ -4,7 +4,7 @@
 // Initialize static members
 float LedMagnetController::globalLuminosityValue = 1.0f; // Default to full brightness
 
-LedMagnetController::LedMagnetController(std::shared_ptr<ISerialPort> serialPort)
+LedMagnetController::LedMagnetController()
 	: lastSendTime(0.0f)
 	, totalTime(0.0f)
 	, sampleCount(0)
@@ -16,8 +16,8 @@ LedMagnetController::LedMagnetController(std::shared_ptr<ISerialPort> serialPort
 	, lastSentArc(0)
 	, rgbInitialized(false)
 	, mainLedInitialized(false)
-	, pwmInitialized(false)
-	, serialPort(serialPort) {
+	, pwmInitialized(false) {
+	// Serial port removed - OSC-only mode
 }
 
 LedMagnetController::~LedMagnetController() {
@@ -25,53 +25,39 @@ LedMagnetController::~LedMagnetController() {
 }
 
 LedMagnetController::ConnectionResult LedMagnetController::connect(const std::string & portName, int baudRate) {
-	auto & portManager = SerialPortManager::getInstance();
-	serialPort = portManager.getPort(portName, baudRate);
+	// Serial connection removed - operating in OSC-only mode
+	connectedPortName = portName; // Keep for reference only
+	ofLogNotice("LedMagnetController") << "Operating in OSC-only mode (no serial)";
 
-	if (!serialPort) {
-		return ConnectionResult::DEVICE_NOT_FOUND;
-	}
-
-	connectedPortName = portName;
-	ofLogNotice("CanProtocol") << "Connected to CAN device: " << portName;
-
-	// Reset initialized flags on new connection so first commands always send
+	// Reset initialized flags so first commands always send
 	rgbInitialized = false;
 	mainLedInitialized = false;
 	pwmInitialized = false;
-
-	send({ 0x00 });
-	ofLogNotice("CanProtocol") << "CAN protocol initialized";
 
 	return ConnectionResult::SUCCESS;
 }
 
 LedMagnetController::ConnectionResult LedMagnetController::connect(int deviceIndex, int baudRate) {
-	auto devices = getAvailableDevices();
-
-	if (deviceIndex < 0 || deviceIndex >= devices.size()) {
-		return ConnectionResult::INVALID_INDEX;
-	}
-
-	return connect(devices[deviceIndex], baudRate);
+	// Serial connection removed - operating in OSC-only mode
+	ofLogNotice("LedMagnetController") << "Operating in OSC-only mode (device index " << deviceIndex << ")";
+	return ConnectionResult::SUCCESS;
 }
 
 bool LedMagnetController::isConnected() const {
-	return serialPort && serialPort->isInitialized();
+	// Always return true for OSC operation - serial connection not required
+	return true;
+	// Original serial check: return serialPort && serialPort->isInitialized();
 }
 
 void LedMagnetController::disconnect() {
-	if (serialPort) {
-		serialPort->close();
-		serialPort.reset();
-		connectedPortName.clear();
-		ofLogNotice("CanProtocol") << "Disconnected from CAN device";
-	}
+	// Serial connection removed - nothing to disconnect
+	connectedPortName.clear();
+	ofLogNotice("LedMagnetController") << "Disconnected (OSC-only mode)";
 }
 
 std::vector<std::string> LedMagnetController::getAvailableDevices() {
-	auto & portManager = SerialPortManager::getInstance();
-	return portManager.getAvailablePorts();
+	// Serial connection removed - return empty list
+	return std::vector<std::string>();
 }
 
 std::string LedMagnetController::getConnectedDeviceName() const {
@@ -111,9 +97,13 @@ float LedMagnetController::getGlobalLuminosity() {
 LedMagnetController & LedMagnetController::sendLED(uint8_t value, float individualLuminosityFactor) { // Main LED
 	uint8_t modulatedValue = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(value) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
 
+	// Debug logging for Main LED issues
 	if (mainLedInitialized && modulatedValue == lastSentMainLED) {
+		ofLogVerbose("LedMagnetController") << "ID " << id << " - Main LED unchanged: " << (int)modulatedValue;
 		return *this;
 	}
+
+	ofLogNotice("LedMagnetController") << "ID " << id << " - Main LED changed: " << (int)lastSentMainLED << " → " << (int)modulatedValue;
 	send({ 1, modulatedValue });
 	lastSentMainLED = modulatedValue;
 	mainLedInitialized = true;
@@ -193,22 +183,12 @@ LedMagnetController & LedMagnetController::sendDotStar(const ofColor & color, ui
 }
 
 bool LedMagnetController::send(ControlType type, const std::vector<uint8_t> & data) {
-	std::vector<uint8_t> packet = { static_cast<uint8_t>(type) };
-	packet.insert(packet.end(), data.begin(), data.end());
-	return send(packet);
+	// ControlType no longer needed in OSC-only mode, just call standard send
+	return send(data);
 }
 
 bool LedMagnetController::send(const std::vector<uint8_t> & data) {
-	if (!isConnected()) {
-		ofLogError("CanProtocol") << "Cannot send command: Not connected to device";
-		return false;
-	}
-
-	if (data.size() > 8) {
-		ofLogError("CanProtocol") << "Data too large (max 8 bytes): " << data.size();
-		return false;
-	}
-
+	// Serial communication completely removed - just track timing for compatibility
 	float currentTime = ofGetElapsedTimef();
 	float timeSinceLastSend = currentTime - lastSendTime;
 
@@ -223,66 +203,22 @@ bool LedMagnetController::send(const std::vector<uint8_t> & data) {
 			totalTime -= oldestSample;
 			sampleCount--;
 		}
-		if (sampleCount > 0) { // Prevent division by zero if all samples were removed
-			// Removed unused averageTime calculation
-		}
 	}
 
 	lastSendTime = currentTime;
 
-	std::vector<uint8_t> packet = buildPacket(data);
-
-	// Log what we're sending including device ID
+	// Log command for debugging (OSC-only mode)
 	std::string dataStr = "";
 	for (size_t i = 0; i < data.size(); i++) {
 		if (i > 0) dataStr += " ";
 		dataStr += std::to_string(static_cast<int>(data[i]));
 	}
-	ofLogNotice("LedMagnetController") << "Sending to ID " << id << ": [" << dataStr << "]";
-
-	serialPort->writeBytes(packet.data(), packet.size());
-
-	// Notify SerialPortManager for statistics
-	SerialPortManager::getInstance().trackWrite(packet.size()); // Use existing trackWrite method
+	ofLogVerbose("LedMagnetController") << "OSC-only command ID " << id << ": [" << dataStr << "]";
 
 	return true;
 }
 
-std::vector<uint8_t> LedMagnetController::buildPacket(const std::vector<uint8_t> & data) const {
-	std::vector<uint8_t> packet;
-	uint8_t checksum = 0;
-
-	std::vector<uint8_t> idBytes;
-	int numIdBytes = (id < 2048 ? 2 : 4);
-	for (int i = 0; i < numIdBytes; i++) {
-		uint8_t id_byte = (id >> (8 * i)) & 255;
-		idBytes.insert(idBytes.begin(), id_byte);
-		checksum = (checksum + id_byte) % 256;
-	}
-
-	for (uint8_t dataByte : data) {
-		checksum = (checksum + dataByte) % 256;
-	}
-
-	uint8_t flags = (ext ? 0x80 : 0) | (rtr ? 0x40 : 0) | (data.size() & 0x3F);
-	checksum = (checksum + flags) % 256;
-
-	packet.push_back(START_BYTE);
-	packet.push_back(flags);
-
-	for (uint8_t idByte : idBytes) {
-		packet.push_back(idByte);
-	}
-
-	for (uint8_t dataByte : data) {
-		packet.push_back(dataByte);
-	}
-
-	packet.push_back(checksum);
-	packet.push_back(END_BYTE);
-
-	return packet;
-}
+// buildPacket method removed - no longer needed without serial communication
 
 // RGB optimization static variables
 uint8_t LedMagnetController::gammaLUT[256];

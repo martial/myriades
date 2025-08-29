@@ -26,8 +26,6 @@ void ofApp::setup() {
 
 //--------------------------------------------------------------
 void ofApp::update() {
-	ofSetLogLevel(OF_LOG_VERBOSE);
-
 	// Update OSC controller (process incoming messages)
 	oscController.update();
 
