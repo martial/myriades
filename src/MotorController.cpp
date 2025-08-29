@@ -10,8 +10,8 @@ const T & local_clamp(const T & value, const T & low, const T & high) {
 }
 }
 
-MotorController::MotorController(std::shared_ptr<ISerialPort> serialPort)
-	: serialPort(serialPort) {
+MotorController::MotorController() {
+	// OSC-only constructor - no serial port needed
 }
 
 MotorController::~MotorController() {
@@ -19,17 +19,11 @@ MotorController::~MotorController() {
 }
 
 MotorController::ConnectionResult MotorController::connect(const std::string & portName, int baudRate) {
-	auto & portManager = SerialPortManager::getInstance();
-	serialPort = portManager.getPort(portName, baudRate);
-
-	if (!serialPort) {
-		return ConnectionResult::DEVICE_NOT_FOUND;
-	}
-
+	// Serial disabled - operating in OSC-only mode
 	connectedPortName = portName;
-	ofLogNotice("MotorController") << "Connected to motor device: " << portName;
+	ofLogNotice("MotorController") << "Motor operating in OSC-only mode (port: " << portName << ")";
 
-	// Reset initialized flags on new connection
+	// Reset initialized flags
 	motorEnabledStateInitialized = false;
 	microstepInitialized = false;
 
@@ -37,31 +31,26 @@ MotorController::ConnectionResult MotorController::connect(const std::string & p
 }
 
 MotorController::ConnectionResult MotorController::connect(int deviceIndex, int baudRate) {
-	auto devices = getAvailableDevices();
-
-	if (deviceIndex < 0 || deviceIndex >= devices.size()) {
-		return ConnectionResult::INVALID_INDEX;
-	}
-
-	return connect(devices[deviceIndex], baudRate);
+	// Serial disabled - just log the request
+	ofLogNotice("MotorController") << "Motor operating in OSC-only mode (device index: " << deviceIndex << ")";
+	connectedPortName = "OSC_DEVICE_" + std::to_string(deviceIndex);
+	return ConnectionResult::SUCCESS;
 }
 
 bool MotorController::isConnected() const {
-	return serialPort && serialPort->isInitialized();
+	// Always connected in OSC-only mode
+	return true;
 }
 
 void MotorController::disconnect() {
-	if (serialPort) {
-		serialPort->close();
-		serialPort.reset();
-		connectedPortName.clear();
-		ofLogNotice("MotorController") << "Disconnected from motor device";
-	}
+	// Serial disabled - just clear the name
+	connectedPortName.clear();
+	ofLogNotice("MotorController") << "Motor disconnected (OSC-only mode)";
 }
 
 std::vector<std::string> MotorController::getAvailableDevices() {
-	auto & portManager = SerialPortManager::getInstance();
-	return portManager.getAvailablePorts();
+	// Serial disabled - return empty list
+	return std::vector<std::string>();
 }
 
 std::string MotorController::getConnectedDeviceName() const {
@@ -226,26 +215,9 @@ bool MotorController::send(const std::vector<uint8_t> & data) {
 	}
 	ofLogNotice("MotorController") << "Motor ID " << id << " command processed for OSC-only: [" << dataStr << "]";
 
-	// If we have a serial port, send the command
-	if (isConnected()) {
-		std::vector<uint8_t> packet = buildPacket(data);
+	// Serial disabled - command processed for OSC-only operation
 
-		// Send entire packet at once instead of byte-by-byte for better performance
-		serialPort->writeBytes(packet.data(), packet.size());
-
-		// Notify SerialPortManager for statistics
-		SerialPortManager::getInstance().trackWrite(packet.size()); // Use existing trackWrite method
-	}
-
-	// Log the sent packet (only in debug mode to reduce overhead)
-#ifdef DEBUG
-	std::string hexStr = "Motor sent: ";
-	for (size_t i = 0; i < packet.size(); i++) {
-		hexStr += "0x" + ofToString(static_cast<int>(packet[i]), 16);
-		if (i < packet.size() - 1) hexStr += " ";
-	}
-	//ofLogNotice("MotorController") << hexStr;
-#endif
+	// Debug logging removed - no packet to log in OSC-only mode
 
 	return true;
 }

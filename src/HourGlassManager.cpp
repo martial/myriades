@@ -1,5 +1,4 @@
 #include "HourGlassManager.h"
-#include "SerialPortManager.h"
 
 HourGlassManager::HourGlassManager()
 	: configFilePath("hourglasses.json")
@@ -199,8 +198,8 @@ std::vector<std::string> HourGlassManager::getHourGlassNames() const {
 }
 
 std::vector<std::string> HourGlassManager::getAvailableSerialPorts() const {
-	auto & portManager = SerialPortManager::getInstance();
-	return portManager.getAvailablePorts();
+	// Serial disabled - return empty list
+	return std::vector<std::string>();
 }
 
 // JSON helpers

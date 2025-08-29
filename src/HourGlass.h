@@ -6,7 +6,7 @@
 #include "LedMagnetController.h"
 #include "MotorController.h"
 #include "OSCOutController.h"
-#include "SerialPortManager.h"
+
 #include "ofMain.h"
 #include "ofParameter.h"
 #include "ofxOsc.h"
@@ -137,7 +137,6 @@ private:
 	int downLedId;
 	int motorId;
 
-	std::shared_ptr<ISerialPort> sharedSerialPort;
 	bool connected;
 
 	EffectsManager upEffectsManager;

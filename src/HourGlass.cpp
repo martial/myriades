@@ -100,17 +100,9 @@ bool HourGlass::connect() {
 		return true;
 	}
 
-	// Get shared serial port
-	auto & portManager = SerialPortManager::getInstance();
-	sharedSerialPort = portManager.getPort(serialPortName, baudRate);
+	ofLogWarning("HourGlass") << name << " - Serial port specified but serial is disabled, continuing in OSC-only mode";
 
-	if (!sharedSerialPort) {
-		ofLogWarning("HourGlass") << name << " - Failed to get serial port: " << serialPortName << ", continuing in OSC-only mode";
-		connected = true; // Allow OSC operation even without serial
-		return true;
-	}
-
-	// Re-setup controllers with serial connection
+	// Re-setup controllers without serial connection
 	setupControllers();
 	connected = true;
 
@@ -130,7 +122,6 @@ void HourGlass::disconnect() {
 		if (downLedMagnet) downLedMagnet->disconnect();
 		if (motor) motor->disconnect();
 
-		sharedSerialPort.reset();
 		connected = false;
 	}
 }
@@ -144,8 +135,8 @@ void HourGlass::setupControllers() {
 	downLedMagnet.reset(new LedMagnetController());
 	downLedMagnet->setId(downLedId);
 
-	// Setup Motor Controller (OSC-only mode, works without serial)
-	motor.reset(new MotorController(sharedSerialPort)); // sharedSerialPort peut être nullptr
+	// Setup Motor Controller (OSC-only mode, no serial)
+	motor.reset(new MotorController()); // No serial port needed
 	motor->setId(motorId);
 }
 

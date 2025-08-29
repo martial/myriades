@@ -1,6 +1,5 @@
 #pragma once
 
-#include "SerialPortManager.h"
 #include "ofMain.h"
 #include <memory>
 
@@ -25,8 +24,8 @@ public:
 		PORT_IN_USE
 	};
 
-	// Constructor with dependency injection
-	explicit MotorController(std::shared_ptr<ISerialPort> serialPort = nullptr);
+	// Constructor for OSC-only operation
+	MotorController();
 	~MotorController();
 
 	// Setup and connection
@@ -82,7 +81,6 @@ public:
 	void logCalibrationData(float commanded, float actual, float gearRatio, float calibrationFactor);
 
 private:
-	std::shared_ptr<ISerialPort> serialPort;
 	std::string connectedPortName;
 
 	// Protocol parameters
