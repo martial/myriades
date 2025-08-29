@@ -329,9 +329,17 @@ LedMagnetController & LedMagnetController::sendAllLEDParameters(
 	uint8_t mainLedValue, uint8_t pwmValue,
 	float individualLuminosityFactor) {
 
-	// Pre-check each parameter type to avoid unnecessary calls
+	// Queue only the parameters that have changed
+	queueRGBIfChanged(r, g, b, blend, origin, arc, individualLuminosityFactor);
+	queueMainLEDIfChanged(mainLedValue, individualLuminosityFactor);
+	queuePWMIfChanged(pwmValue);
 
-	// 1. Check if RGB/arc/blend/origin parameters changed
+	return *this;
+}
+
+// Queue RGB LED if parameters changed
+void LedMagnetController::queueRGBIfChanged(uint8_t r, uint8_t g, uint8_t b, int blend, int origin, int arc, float individualLuminosityFactor) {
+	// Calculate final values for comparison
 	uint8_t optR = optimizeRGB(r);
 	uint8_t optG = optimizeRGB(g);
 	uint8_t optB = optimizeRGB(b);
@@ -343,36 +351,77 @@ LedMagnetController & LedMagnetController::sendAllLEDParameters(
 	int clampedArc = OSCHelper::clamp(arc, 0, 360);
 	ofColor currentColor(finalR, finalG, finalB);
 
+	// Check if RGB parameters changed
 	bool rgbNeedsUpdate = !rgbInitialized || !(currentColor == lastSentRGB && clampedBlend == lastSentBlend && clampedOrigin == lastSentOrigin && clampedArc == lastSentArc);
 
-	// 2. Check if Main LED value changed
+	if (rgbNeedsUpdate) {
+		QueuedMessage msg(MessageType::RGB_LED, ofGetElapsedTimeMillis(), individualLuminosityFactor);
+		msg.r = r; msg.g = g; msg.b = b;
+		msg.blend = blend; msg.origin = origin; msg.arc = arc;
+		messageQueue.push(msg);
+		ofLogVerbose("LedMagnetController") << "ID " << id << " - Queued RGB command";
+	}
+}
+
+// Queue Main LED if value changed
+void LedMagnetController::queueMainLEDIfChanged(uint8_t mainLedValue, float individualLuminosityFactor) {
 	uint8_t finalMainLed = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(mainLedValue) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
 	bool mainLedNeedsUpdate = !mainLedInitialized || (finalMainLed != lastSentMainLED);
 
-	// 3. Check if PWM value changed
+	if (mainLedNeedsUpdate) {
+		QueuedMessage msg(MessageType::MAIN_LED, ofGetElapsedTimeMillis(), individualLuminosityFactor);
+		msg.mainLedValue = mainLedValue;
+		messageQueue.push(msg);
+		ofLogVerbose("LedMagnetController") << "ID " << id << " - Queued Main LED command";
+	}
+}
+
+// Queue PWM if value changed
+void LedMagnetController::queuePWMIfChanged(uint8_t pwmValue) {
 	bool pwmNeedsUpdate = !pwmInitialized || (pwmValue != lastSentPWM);
 
-	// ONLY send commands for parameters that actually changed
-	if (rgbNeedsUpdate) {
-		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending RGB command (changed)";
-		sendLED(r, g, b, blend, origin, arc, individualLuminosityFactor, true);
-	} else {
-		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping RGB command (same values)";
-	}
-
-	if (mainLedNeedsUpdate) {
-		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending Main LED command (changed)";
-		sendLED(mainLedValue, individualLuminosityFactor);
-	} else {
-		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping Main LED command (same value)";
-	}
-
 	if (pwmNeedsUpdate) {
-		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending PWM command (changed)";
-		sendPWM(pwmValue);
-	} else {
-		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping PWM command (same value)";
+		QueuedMessage msg(MessageType::PWM, ofGetElapsedTimeMillis());
+		msg.pwmValue = pwmValue;
+		messageQueue.push(msg);
+		ofLogVerbose("LedMagnetController") << "ID " << id << " - Queued PWM command";
+	}
+}
+
+// Process message queue with throttling
+void LedMagnetController::processMessageQueue() {
+	if (messageQueue.empty()) return;
+
+	float currentTime = ofGetElapsedTimeMillis();
+	
+	// Check if enough time has passed since last message
+	if (currentTime - lastQueueProcessTime < MIN_MESSAGE_INTERVAL_MS) {
+		return; // Too early, wait more
 	}
 
-	return *this;
+	// Send the oldest message in queue
+	QueuedMessage msg = messageQueue.front();
+	messageQueue.pop();
+
+	switch (msg.type) {
+		case MessageType::RGB_LED:
+			ofLogNotice("LedMagnetController") << "ID " << id << " - Sending queued RGB command";
+			sendLED(msg.r, msg.g, msg.b, msg.blend, msg.origin, msg.arc, msg.individualLuminosityFactor, true);
+			break;
+		case MessageType::MAIN_LED:
+			ofLogNotice("LedMagnetController") << "ID " << id << " - Sending queued Main LED command";
+			sendLED(msg.mainLedValue, msg.individualLuminosityFactor);
+			break;
+		case MessageType::PWM:
+			ofLogNotice("LedMagnetController") << "ID " << id << " - Sending queued PWM command";
+			sendPWM(msg.pwmValue);
+			break;
+	}
+
+	lastQueueProcessTime = currentTime;
+}
+
+// Update method to be called regularly
+void LedMagnetController::update() {
+	processMessageQueue();
 }

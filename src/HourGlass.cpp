@@ -373,6 +373,7 @@ void HourGlass::applyLedParameters() {
 			static_cast<uint8_t>(upParams.mainLedValue),
 			static_cast<uint8_t>(upPwm.get()),
 			finalUpIndividualLuminosity);
+		upLedMagnet->update(); // Process message queue
 	}
 
 	// Send OSC messages for UP LED only when parameters change (avoid flooding)
@@ -425,6 +426,7 @@ void HourGlass::applyLedParameters() {
 			static_cast<uint8_t>(downParams.mainLedValue),
 			static_cast<uint8_t>(downPwm.get()),
 			finalDownIndividualLuminosity);
+		downLedMagnet->update(); // Process message queue
 	}
 
 	// Send OSC messages for DOWN LED if not updating from OSC (avoid feedback loops)

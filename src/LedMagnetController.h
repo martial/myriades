@@ -3,6 +3,7 @@
 #include "ofMain.h"
 #include <algorithm>
 #include <memory>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,31 @@ public:
 		CONNECTION_FAILED,
 		INVALID_INDEX,
 		PORT_IN_USE
+	};
+
+	// Message queue system for optimized sending
+	enum class MessageType {
+		RGB_LED,
+		MAIN_LED,
+		PWM
+	};
+
+	struct QueuedMessage {
+		MessageType type;
+		float timestamp;
+		// RGB LED parameters
+		uint8_t r, g, b;
+		int blend, origin, arc;
+		// Main LED parameter
+		uint8_t mainLedValue;
+		// PWM parameter
+		uint8_t pwmValue;
+		// Common parameter
+		float individualLuminosityFactor;
+
+		QueuedMessage(MessageType t, float ts, float lumFactor = 1.0f) 
+			: type(t), timestamp(ts), individualLuminosityFactor(lumFactor),
+			  r(0), g(0), b(0), blend(0), origin(0), arc(0), mainLedValue(0), pwmValue(0) {}
 	};
 
 	// Constructor - OSC-only mode (serial removed)
@@ -56,6 +82,15 @@ public:
 		int blend, int origin, int arc,
 		uint8_t mainLedValue, uint8_t pwmValue,
 		float individualLuminosityFactor = 1.0f);
+
+	// Optimized individual parameter methods (queue only changed parameters)
+	void queueRGBIfChanged(uint8_t r, uint8_t g, uint8_t b, int blend, int origin, int arc, float individualLuminosityFactor = 1.0f);
+	void queueMainLEDIfChanged(uint8_t mainLedValue, float individualLuminosityFactor = 1.0f);
+	void queuePWMIfChanged(uint8_t pwmValue);
+
+	// Queue processing
+	void processMessageQueue();
+	void update(); // Call this regularly to process queue
 
 	// RGB optimization for better low-value performance
 	static uint8_t optimizeRGB(uint8_t value);
@@ -136,6 +171,11 @@ private:
 	int id = 11;
 	bool ext = false;
 	bool rtr = false;
+
+	// Message queue system
+	std::queue<QueuedMessage> messageQueue;
+	static constexpr float MIN_MESSAGE_INTERVAL_MS = 16.0f; // ~60 FPS max send rate
+	float lastQueueProcessTime = 0.0f;
 
 	// Serial protocol constants removed (no longer needed)
 
