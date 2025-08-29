@@ -373,32 +373,39 @@ void HourGlass::applyLedParameters() {
 			static_cast<uint8_t>(upParams.mainLedValue),
 			static_cast<uint8_t>(upPwm.get()),
 			finalUpIndividualLuminosity);
-		upLedMagnet->update(); // Process message queue
 	}
 
-	// Send OSC messages for UP LED only when parameters change (avoid flooding)
+	// Send OSC messages for UP LED - OPTIMIZED: only send what changed
+	if (isOSCOutEnabled() && !updatingFromOSC) {
+		// Check individual parameter changes
+		bool upRgbChanged = (upParams.color != lastUpColor || upParams.origin != lastUpOrigin || upParams.arc != lastUpArc || finalUpIndividualLuminosity != lastUpLuminosity);
+		bool upMainLedChanged = (upParams.mainLedValue != lastUpMainLed);
+		bool upPwmChanged = (upPwm.get() != lastUpPwm);
 
-	bool upParamsChanged = (upParams.color != lastUpColor || upParams.origin != lastUpOrigin || upParams.arc != lastUpArc || upPwm.get() != lastUpPwm || upParams.mainLedValue != lastUpMainLed || finalUpIndividualLuminosity != lastUpLuminosity);
+		// Send RGB message if RGB parameters changed
+		if (upRgbChanged) {
+			uint8_t masterAlpha = static_cast<uint8_t>(finalUpIndividualLuminosity * 255.0f);
+			oscOutController->sendRGBLED("top", upParams.color.r, upParams.color.g, upParams.color.b,
+				masterAlpha, upParams.origin, upParams.arc);
+			
+			// Update RGB tracking
+			lastUpColor = upParams.color;
+			lastUpOrigin = upParams.origin;
+			lastUpArc = upParams.arc;
+			lastUpLuminosity = finalUpIndividualLuminosity;
+		}
 
-	if (isOSCOutEnabled() && !updatingFromOSC && upParamsChanged) {
-		// RGB LED control with alpha as master brightness
-		uint8_t masterAlpha = static_cast<uint8_t>(finalUpIndividualLuminosity * 255.0f);
-		oscOutController->sendRGBLED("top", upParams.color.r, upParams.color.g, upParams.color.b,
-			masterAlpha, upParams.origin, upParams.arc);
+		// Send Main LED message if Main LED changed OR if RGB changed (sync requirement)
+		if (upMainLedChanged || upRgbChanged) {
+			oscOutController->sendPowerLED("top", static_cast<uint8_t>(upParams.mainLedValue));
+			lastUpMainLed = upParams.mainLedValue;
+		}
 
-		// Power LED control - Main LED slider controls power LED
-		oscOutController->sendPowerLED("top", static_cast<uint8_t>(upParams.mainLedValue));
-
-		// Electromagnet control - PWM slider controls magnet
-		oscOutController->sendMagnet("top", static_cast<uint8_t>(upPwm.get()));
-
-		// Update last values
-		lastUpColor = upParams.color;
-		lastUpOrigin = upParams.origin;
-		lastUpArc = upParams.arc;
-		lastUpPwm = upPwm.get();
-		lastUpMainLed = upParams.mainLedValue;
-		lastUpLuminosity = finalUpIndividualLuminosity;
+		// Send PWM message if PWM changed OR if RGB changed (sync requirement)
+		if (upPwmChanged || upRgbChanged) {
+			oscOutController->sendMagnet("top", static_cast<uint8_t>(upPwm.get()));
+			lastUpPwm = upPwm.get();
+		}
 	}
 
 	// --- DOWN LED Controller ---
@@ -426,32 +433,39 @@ void HourGlass::applyLedParameters() {
 			static_cast<uint8_t>(downParams.mainLedValue),
 			static_cast<uint8_t>(downPwm.get()),
 			finalDownIndividualLuminosity);
-		downLedMagnet->update(); // Process message queue
 	}
 
-	// Send OSC messages for DOWN LED if not updating from OSC (avoid feedback loops)
+	// Send OSC messages for DOWN LED - OPTIMIZED: only send what changed
+	if (isOSCOutEnabled() && !updatingFromOSC) {
+		// Check individual parameter changes
+		bool downRgbChanged = (downParams.color != lastDownColor || downParams.origin != lastDownOrigin || downParams.arc != lastDownArc || finalDownIndividualLuminosity != lastDownLuminosity);
+		bool downMainLedChanged = (downParams.mainLedValue != lastDownMainLed);
+		bool downPwmChanged = (downPwm.get() != lastDownPwm);
 
-	bool downParamsChanged = (downParams.color != lastDownColor || downParams.origin != lastDownOrigin || downParams.arc != lastDownArc || downPwm.get() != lastDownPwm || downParams.mainLedValue != lastDownMainLed || finalDownIndividualLuminosity != lastDownLuminosity);
+		// Send RGB message if RGB parameters changed
+		if (downRgbChanged) {
+			uint8_t masterAlpha = static_cast<uint8_t>(finalDownIndividualLuminosity * 255.0f);
+			oscOutController->sendRGBLED("bot", downParams.color.r, downParams.color.g, downParams.color.b,
+				masterAlpha, downParams.origin, downParams.arc);
+			
+			// Update RGB tracking
+			lastDownColor = downParams.color;
+			lastDownOrigin = downParams.origin;
+			lastDownArc = downParams.arc;
+			lastDownLuminosity = finalDownIndividualLuminosity;
+		}
 
-	if (isOSCOutEnabled() && !updatingFromOSC && downParamsChanged) {
-		// RGB LED control with alpha as master brightness
-		uint8_t masterAlpha = static_cast<uint8_t>(finalDownIndividualLuminosity * 255.0f);
-		oscOutController->sendRGBLED("bot", downParams.color.r, downParams.color.g, downParams.color.b,
-			masterAlpha, downParams.origin, downParams.arc);
+		// Send Main LED message if Main LED changed OR if RGB changed (sync requirement)
+		if (downMainLedChanged || downRgbChanged) {
+			oscOutController->sendPowerLED("bot", static_cast<uint8_t>(downParams.mainLedValue));
+			lastDownMainLed = downParams.mainLedValue;
+		}
 
-		// Power LED control - Main LED slider controls power LED
-		oscOutController->sendPowerLED("bot", static_cast<uint8_t>(downParams.mainLedValue));
-
-		// Electromagnet control - PWM slider controls magnet
-		oscOutController->sendMagnet("bot", static_cast<uint8_t>(downPwm.get()));
-
-		// Update last values for DOWN LED
-		lastDownColor = downParams.color;
-		lastDownOrigin = downParams.origin;
-		lastDownArc = downParams.arc;
-		lastDownPwm = downPwm.get();
-		lastDownMainLed = downParams.mainLedValue;
-		lastDownLuminosity = finalDownIndividualLuminosity;
+		// Send PWM message if PWM changed OR if RGB changed (sync requirement)
+		if (downPwmChanged || downRgbChanged) {
+			oscOutController->sendMagnet("bot", static_cast<uint8_t>(downPwm.get()));
+			lastDownPwm = downPwm.get();
+		}
 	}
 
 	lastLedCommandSendTime = currentTime;
