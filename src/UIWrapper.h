@@ -103,6 +103,7 @@ private:
 
 	// Parameters for UI elements (will be added to panels)
 	ofParameter<int> hourglassSelectorParam;
+	ofParameter<int> framerateParam;
 	ofParameter<void> connectBtnParam;
 	ofParameter<void> disconnectBtnParam;
 	ofParameter<void> emergencyStopBtnParam;
@@ -132,6 +133,7 @@ private:
 	// UI sliders for LED effect parameters (separate for up and down)
 	// These ofxIntSlider objects might become redundant if panels directly use ofParameter<int>
 	// or if they are managed more generically. For now, keeping them if they are explicitly used.
+	ofxIntSlider framerateSlider;
 	ofxIntSlider upLedBlendSlider, upLedOriginSlider, upLedArcSlider;
 	ofxIntSlider downLedBlendSlider, downLedOriginSlider, downLedArcSlider;
 
@@ -143,6 +145,7 @@ private:
 
 	// Listener method for global luminosity
 	void onGlobalLuminosityChanged(float & luminosity);
+	void onFramerateChanged(int & framerate);
 
 	// Setup methods
 	void setupPanels();

@@ -176,6 +176,11 @@ void UIWrapper::setupPanels() {
 	globalLuminositySlider.setup(globalLuminosityParam);
 	settingsPanel.add(&globalLuminositySlider);
 
+	// Framerate Control (20, 30, 50, 60 FPS)
+	framerateParam.set("Framerate (FPS)", 60, 20, 60);
+	framerateSlider.setup(framerateParam);
+	settingsPanel.add(&framerateSlider);
+
 	// --- Actions Section ---
 	allOffBtnParam.set("ALL OFF");
 	ledsOffBtnParam.set("LEDs Off");
@@ -304,6 +309,9 @@ void UIWrapper::setupListeners() {
 
 	// Global Luminosity Listener
 	globalLuminosityParam.addListener(this, &UIWrapper::onGlobalLuminosityChanged);
+
+	// Framerate Listener
+	framerateParam.addListener(this, &UIWrapper::onFramerateChanged);
 
 	// Effects Listeners
 	addCosineArcEffectBtn.addListener(this, &UIWrapper::onAddCosineArcEffectPressed);
@@ -1013,6 +1021,7 @@ void UIWrapper::saveSettings() {
 	auto uiStateNode = uiStateConfig.appendChild("UIState");
 	uiStateNode.setAttribute("currentHourGlass", ofToString(currentHourGlass));
 	uiStateNode.setAttribute("globalLuminosity", ofToString(LedMagnetController::getGlobalLuminosity()));
+	uiStateNode.setAttribute("framerate", ofToString(framerateParam.get()));
 	uiStateNode.setAttribute("syncColors", syncColorsParam.get() ? "true" : "false");
 	uiStateConfig.save("ui_state.xml");
 
@@ -1046,6 +1055,12 @@ void UIWrapper::loadSettings() {
 			if (globalLum >= 0.0f && globalLum <= 1.0f) { // Basic validation
 				LedMagnetController::setGlobalLuminosity(globalLum);
 				updateGlobalLuminositySlider(globalLum);
+			}
+
+			int savedFramerate = ofToInt(uiStateNode.getAttribute("framerate").getValue());
+			if (savedFramerate >= 20 && savedFramerate <= 60) { // Basic validation for framerate range
+				framerateParam.set(savedFramerate);
+				ofSetFrameRate(savedFramerate); // Apply the framerate immediately
 			}
 
 			bool syncColors = (uiStateNode.getAttribute("syncColors").getValue() == "true");
@@ -1098,6 +1113,12 @@ void UIWrapper::onGlobalLuminosityChanged(float & luminosity) {
 	if (oscControllerInstance) {
 		oscControllerInstance->forceRefreshAllHardwareStates();
 	}
+}
+
+void UIWrapper::onFramerateChanged(int & framerate) {
+	// Set OpenFrameworks target framerate
+	ofSetFrameRate(framerate);
+	ofLogNotice("UIWrapper") << "Framerate changed to: " << framerate << " FPS";
 }
 
 void UIWrapper::onIndividualLuminosityChanged(float & luminosity) {
