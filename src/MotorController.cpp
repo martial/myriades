@@ -213,7 +213,7 @@ bool MotorController::send(const std::vector<uint8_t> & data) {
 		if (i > 0) dataStr += " ";
 		dataStr += std::to_string(static_cast<int>(data[i]));
 	}
-	ofLogNotice("MotorController") << "Motor ID " << id << " command processed for OSC-only: [" << dataStr << "]";
+	//ofLogNotice("MotorController") << "Motor ID " << id << " command processed for OSC-only: [" << dataStr << "]";
 
 	// Serial disabled - command processed for OSC-only operation
 

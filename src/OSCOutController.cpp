@@ -123,6 +123,21 @@ void OSCOutController::sendMotorZero(int deviceId) {
 	ofxOscMessage msg;
 	msg.setAddress("/motor/zero");
 
+	// Detailed logging for motor zero commands
+	ofLogNotice("OSCOutController") << "🎌 SENDING MOTOR ZERO - Device: " << deviceId
+									<< " | Address: " << msg.getAddress();
+
+	// Log destinations
+	for (const auto & dest : destinations) {
+		if (dest.enabled) {
+			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
+											<< " | " << dest.ip << ":" << dest.port << " ✅";
+		} else {
+			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
+											<< " | " << dest.ip << ":" << dest.port << " ❌ (disabled)";
+		}
+	}
+
 	sendMessageToAll(msg);
 }
 
@@ -166,6 +181,24 @@ void OSCOutController::sendMotorRelative(int deviceId, float speedRotMin, float 
 	msg.addFloatArg(accDegPerS2);
 	msg.addFloatArg(moveDeg);
 
+	// Detailed logging for motor relative commands
+	ofLogNotice("OSCOutController") << "🚀 SENDING MOTOR RELATIVE - Device: " << deviceId
+									<< " | Speed: " << speedRotMin << " rot/min"
+									<< " | Accel: " << accDegPerS2 << " deg/s²"
+									<< " | Move: " << moveDeg << " degrees"
+									<< " | Address: " << msg.getAddress();
+
+	// Log destinations
+	for (const auto & dest : destinations) {
+		if (dest.enabled) {
+			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
+											<< " | " << dest.ip << ":" << dest.port << " ✅";
+		} else {
+			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
+											<< " | " << dest.ip << ":" << dest.port << " ❌ (disabled)";
+		}
+	}
+
 	sendMessageToAll(msg);
 }
 
@@ -187,6 +220,24 @@ void OSCOutController::sendMotorAbsolute(int deviceId, float speedRotMin, float 
 	msg.addFloatArg(speedRotMin);
 	msg.addFloatArg(accDegPerS2);
 	msg.addFloatArg(moveDeg);
+
+	// Detailed logging for motor absolute commands
+	ofLogNotice("OSCOutController") << "🎯 SENDING MOTOR ABSOLUTE - Device: " << deviceId
+									<< " | Speed: " << speedRotMin << " rot/min"
+									<< " | Accel: " << accDegPerS2 << " deg/s²"
+									<< " | Position: " << moveDeg << " degrees"
+									<< " | Address: " << msg.getAddress();
+
+	// Log destinations
+	for (const auto & dest : destinations) {
+		if (dest.enabled) {
+			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
+											<< " | " << dest.ip << ":" << dest.port << " ✅";
+		} else {
+			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
+											<< " | " << dest.ip << ":" << dest.port << " ❌ (disabled)";
+		}
+	}
 
 	sendMessageToAll(msg);
 }
