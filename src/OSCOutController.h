@@ -70,7 +70,7 @@ private:
 	// Internal helpers
 	void ensureSenderExists(const OSCDestination & dest);
 	void sendMessageToAll(const ofxOscMessage & message);
-	void sendMessageToDestination(const ofxOscMessage & message, const std::string & destName);
+	void sendMessageToDestination(const ofxOscMessage & message, const OSCDestination & dest);
 
 	// Message creation helpers
 	std::string buildMotorAddress(const std::string & command, int deviceId = -1);

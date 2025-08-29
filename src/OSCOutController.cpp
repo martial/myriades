@@ -257,24 +257,24 @@ void OSCOutController::sendMessageToAll(const ofxOscMessage & message) {
 
 	for (const auto & dest : destinations) {
 		if (dest.enabled) {
-			sendMessageToDestination(message, dest.name);
+			sendMessageToDestination(message, dest);
 		}
 	}
 	sentMessageCount++;
 }
 
-void OSCOutController::sendMessageToDestination(const ofxOscMessage & message, const std::string & destName) {
-	auto it = senders.find(destName);
+void OSCOutController::sendMessageToDestination(const ofxOscMessage & message, const OSCDestination & dest) {
+	auto it = senders.find(dest.name);
 	if (it != senders.end()) {
 		it->second->sendMessage(message);
-
+		
 		// Build arguments string
 		std::string argsStr = "";
 		if (message.getNumArgs() > 0) {
 			argsStr = " [";
 			for (int i = 0; i < message.getNumArgs(); i++) {
 				if (i > 0) argsStr += ", ";
-
+				
 				if (message.getArgType(i) == OFXOSC_TYPE_INT32) {
 					argsStr += std::to_string(message.getArgAsInt32(i));
 				} else if (message.getArgType(i) == OFXOSC_TYPE_FLOAT) {
@@ -287,8 +287,9 @@ void OSCOutController::sendMessageToDestination(const ofxOscMessage & message, c
 			}
 			argsStr += "]";
 		}
-
-		ofLogNotice("OSCOutController") << "Sent OSC: " << message.getAddress() << argsStr << " → " << destName;
+		
+		ofLogNotice("OSCOutController") << "Sent OSC: " << message.getAddress() << argsStr 
+			<< " → " << dest.name << " (" << dest.ip << ":" << dest.port << ")";
 	}
 }
 
