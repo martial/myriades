@@ -123,21 +123,6 @@ void OSCOutController::sendMotorZero(int deviceId) {
 	ofxOscMessage msg;
 	msg.setAddress("/motor/zero");
 
-	// Detailed logging for motor zero commands
-	ofLogNotice("OSCOutController") << "🎌 SENDING MOTOR ZERO - Device: " << deviceId
-									<< " | Address: " << msg.getAddress();
-
-	// Log destinations
-	for (const auto & dest : destinations) {
-		if (dest.enabled) {
-			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
-											<< " | " << dest.ip << ":" << dest.port << " ✅";
-		} else {
-			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
-											<< " | " << dest.ip << ":" << dest.port << " ❌ (disabled)";
-		}
-	}
-
 	sendMessageToAll(msg);
 }
 
@@ -181,24 +166,6 @@ void OSCOutController::sendMotorRelative(int deviceId, float speedRotMin, float 
 	msg.addFloatArg(accDegPerS2);
 	msg.addFloatArg(moveDeg);
 
-	// Detailed logging for motor relative commands
-	ofLogNotice("OSCOutController") << "🚀 SENDING MOTOR RELATIVE - Device: " << deviceId
-									<< " | Speed: " << speedRotMin << " rot/min"
-									<< " | Accel: " << accDegPerS2 << " deg/s²"
-									<< " | Move: " << moveDeg << " degrees"
-									<< " | Address: " << msg.getAddress();
-
-	// Log destinations
-	for (const auto & dest : destinations) {
-		if (dest.enabled) {
-			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
-											<< " | " << dest.ip << ":" << dest.port << " ✅";
-		} else {
-			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
-											<< " | " << dest.ip << ":" << dest.port << " ❌ (disabled)";
-		}
-	}
-
 	sendMessageToAll(msg);
 }
 
@@ -220,24 +187,6 @@ void OSCOutController::sendMotorAbsolute(int deviceId, float speedRotMin, float 
 	msg.addFloatArg(speedRotMin);
 	msg.addFloatArg(accDegPerS2);
 	msg.addFloatArg(moveDeg);
-
-	// Detailed logging for motor absolute commands
-	ofLogNotice("OSCOutController") << "🎯 SENDING MOTOR ABSOLUTE - Device: " << deviceId
-									<< " | Speed: " << speedRotMin << " rot/min"
-									<< " | Accel: " << accDegPerS2 << " deg/s²"
-									<< " | Position: " << moveDeg << " degrees"
-									<< " | Address: " << msg.getAddress();
-
-	// Log destinations
-	for (const auto & dest : destinations) {
-		if (dest.enabled) {
-			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
-											<< " | " << dest.ip << ":" << dest.port << " ✅";
-		} else {
-			ofLogNotice("OSCOutController") << "  → Destination: " << dest.name
-											<< " | " << dest.ip << ":" << dest.port << " ❌ (disabled)";
-		}
-	}
 
 	sendMessageToAll(msg);
 }
@@ -318,6 +267,28 @@ void OSCOutController::sendMessageToDestination(const ofxOscMessage & message, c
 	auto it = senders.find(destName);
 	if (it != senders.end()) {
 		it->second->sendMessage(message);
+
+		// Build arguments string
+		std::string argsStr = "";
+		if (message.getNumArgs() > 0) {
+			argsStr = " [";
+			for (int i = 0; i < message.getNumArgs(); i++) {
+				if (i > 0) argsStr += ", ";
+
+				if (message.getArgType(i) == OFXOSC_TYPE_INT32) {
+					argsStr += std::to_string(message.getArgAsInt32(i));
+				} else if (message.getArgType(i) == OFXOSC_TYPE_FLOAT) {
+					argsStr += std::to_string(message.getArgAsFloat(i));
+				} else if (message.getArgType(i) == OFXOSC_TYPE_STRING) {
+					argsStr += "\"" + message.getArgAsString(i) + "\"";
+				} else {
+					argsStr += "?";
+				}
+			}
+			argsStr += "]";
+		}
+
+		ofLogNotice("OSCOutController") << "Sent OSC: " << message.getAddress() << argsStr << " → " << destName;
 	}
 }
 

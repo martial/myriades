@@ -376,10 +376,6 @@ void HourGlass::applyLedParameters() {
 	}
 
 	// Send OSC messages for UP LED only when parameters change (avoid flooding)
-	// FIXED: Removed static to avoid cross-hourglass contamination
-	ofColor lastUpColor;
-	int lastUpOrigin = -1, lastUpArc = -1, lastUpPwm = -1, lastUpMainLed = -1;
-	float lastUpLuminosity = -1.0f;
 
 	bool upParamsChanged = (upParams.color != lastUpColor || upParams.origin != lastUpOrigin || upParams.arc != lastUpArc || upPwm.get() != lastUpPwm || upParams.mainLedValue != lastUpMainLed || finalUpIndividualLuminosity != lastUpLuminosity);
 
@@ -432,10 +428,6 @@ void HourGlass::applyLedParameters() {
 	}
 
 	// Send OSC messages for DOWN LED if not updating from OSC (avoid feedback loops)
-	// FIXED: Added individual tracking for DOWN LED (no static shared variables)
-	ofColor lastDownColor;
-	int lastDownOrigin = -1, lastDownArc = -1, lastDownPwm = -1, lastDownMainLed = -1;
-	float lastDownLuminosity = -1.0f;
 
 	bool downParamsChanged = (downParams.color != lastDownColor || downParams.origin != lastDownOrigin || downParams.arc != lastDownArc || downPwm.get() != lastDownPwm || downParams.mainLedValue != lastDownMainLed || finalDownIndividualLuminosity != lastDownLuminosity);
 

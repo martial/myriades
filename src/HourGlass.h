@@ -160,6 +160,12 @@ private:
 	// Helper methods
 	void setupControllers();
 
+	// OSC change tracking to prevent spam
+	ofColor lastUpColor, lastDownColor;
+	int lastUpOrigin = -1, lastUpArc = -1, lastUpPwm = -1, lastUpMainLed = -1;
+	int lastDownOrigin = -1, lastDownArc = -1, lastDownPwm = -1, lastDownMainLed = -1;
+	float lastUpLuminosity = -1.0f, lastDownLuminosity = -1.0f;
+
 	// Helper for minimal view
 	ofRectangle drawSingleLedControllerMinimal(float x, float y, const std::string & label,
 		const ofColor & color, int blend, int origin, int arc,
