@@ -125,8 +125,8 @@ src/
 ├── OSCHelper.*             # OSC utility functions
 └── ofApp.*                 # Main application entry point
 
-OSC_API.csv                 # Complete OSC command documentation
-OSC_API_Documentation.md    # Detailed API documentation
+docs/OSC_API.csv                 # Complete OSC command documentation
+docs/OSC_API_Documentation.md    # Detailed API documentation
 ```
 
 ## Hardware Communication

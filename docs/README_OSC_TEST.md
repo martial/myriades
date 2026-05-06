@@ -9,17 +9,19 @@ Interactive Python script to test OSC commands for the HourGlass LED system.
 pip install python-osc
 
 # Or install from requirements.txt
-pip install -r requirements.txt
+pip install -r scripts/requirements.txt
 ```
 
 ## Usage
 
+Run from the project root:
+
 ```bash
 # Interactive mode (default)
-python test_osc_commands.py
+python scripts/test_osc_commands.py
 
 # Automated test sequence
-python test_osc_commands.py auto
+python scripts/test_osc_commands.py auto
 ```
 
 ## Interactive Commands
