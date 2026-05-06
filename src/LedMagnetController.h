@@ -126,9 +126,6 @@ public:
 	// RGB optimization methods
 	static void initializeLUT();
 
-	// Force reset of "last sent" values (fixes Main LED bug when switching hourglasses)
-	void resetLastSentValues();
-
 private:
 	std::string connectedPortName; // Keep for reference only
 
@@ -136,14 +133,6 @@ private:
 	int id = 11;
 	bool ext = false;
 	bool rtr = false;
-
-	// Serial protocol constants removed (no longer needed)
-
-	// Helper to clamp values
-	template <typename T>
-	static T clamp(T value, T min, T max) {
-		return std::max(min, std::min(value, max));
-	}
 
 	// Global luminosity static data
 	static float globalLuminosityValue;

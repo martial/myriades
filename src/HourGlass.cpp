@@ -5,9 +5,6 @@
 #include <string>
 #include <vector>
 
-// Define the static const member for LED command interval (e.g., 50ms for 20 FPS)
-const float HourGlass::MIN_LED_COMMAND_INTERVAL_MS = 50.0f;
-
 // --- Helper function for text bounding box (user provided, adapted) ---
 static ofRectangle customGetBitmapStringBoundingBox(const std::string & text) {
 	std::vector<std::string> lines = ofSplitString(text, "\n");
@@ -43,7 +40,6 @@ HourGlass::HourGlass(const std::string & name)
 	, motorId(0)
 	, updatingFromOSC(false) // Initialized before 'connected' to match typical declaration order implied by warning
 	, connected(false)
-	, lastLedCommandSendTime(0.0f)
 	, upEffectsManager()
 	, downEffectsManager()
 	, oscOutController(nullptr) {
@@ -339,13 +335,6 @@ void HourGlass::applyLedParameters() {
 	// Allow LED parameter processing even without serial connection
 	bool hasLedControllers = (upLedMagnet && downLedMagnet);
 
-	float currentTime = ofGetElapsedTimeMillis();
-	if (currentTime - lastLedCommandSendTime < MIN_LED_COMMAND_INTERVAL_MS) {
-		// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - Throttled"; // Keep this commented
-		//return;
-	}
-	// ofLogNotice("HourGlass::applyLedParameters") << getName() << " - Applying LED parameters with effects."; // Keep this one for now, or comment if too noisy
-
 	float dt = ofGetLastFrameTime();
 
 	// --- UP LED Controller ---
@@ -463,8 +452,6 @@ void HourGlass::applyLedParameters() {
 			lastDownPwm = downPwm.get();
 		}
 	}
-
-	lastLedCommandSendTime = currentTime;
 }
 
 void HourGlass::commandRelativeMove(int steps, std::optional<int> speed, std::optional<int> accel) {

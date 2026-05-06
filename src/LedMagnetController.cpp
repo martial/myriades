@@ -322,57 +322,17 @@ bool LedMagnetController::isArcActive(int currentAngle, int origin, int arcEnd) 
 	}
 }
 
-// Unified LED command - sends all parameters in one consistent format
+// Unified LED command - sends all parameters in one consistent format.
+// Each leaf sender (sendLED RGB, sendLED main, sendPWM) already short-circuits
+// when its values are unchanged, so we just dispatch unconditionally.
 LedMagnetController & LedMagnetController::sendAllLEDParameters(
 	uint8_t r, uint8_t g, uint8_t b,
 	int blend, int origin, int arc,
 	uint8_t mainLedValue, uint8_t pwmValue,
 	float individualLuminosityFactor) {
 
-	// Pre-check each parameter type to avoid unnecessary calls
-
-	// 1. Check if RGB/arc/blend/origin parameters changed
-	uint8_t optR = optimizeRGB(r);
-	uint8_t optG = optimizeRGB(g);
-	uint8_t optB = optimizeRGB(b);
-	uint8_t finalR = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(optR) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
-	uint8_t finalG = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(optG) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
-	uint8_t finalB = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(optB) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
-	int clampedBlend = OSCHelper::clamp(blend, 0, 768);
-	int clampedOrigin = OSCHelper::clamp(origin, 0, 360);
-	int clampedArc = OSCHelper::clamp(arc, 0, 360);
-	ofColor currentColor(finalR, finalG, finalB);
-
-	bool rgbNeedsUpdate = !rgbInitialized || !(currentColor == lastSentRGB && clampedBlend == lastSentBlend && clampedOrigin == lastSentOrigin && clampedArc == lastSentArc);
-
-	// 2. Check if Main LED value changed
-	uint8_t finalMainLed = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(mainLedValue) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
-	bool mainLedNeedsUpdate = !mainLedInitialized || (finalMainLed != lastSentMainLED);
-
-	// 3. Check if PWM value changed
-	bool pwmNeedsUpdate = !pwmInitialized || (pwmValue != lastSentPWM);
-
-	// ONLY send commands for parameters that actually changed
-	if (rgbNeedsUpdate) {
-		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending RGB command (changed)";
-		sendLED(r, g, b, blend, origin, arc, individualLuminosityFactor, true);
-	} else {
-		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping RGB command (same values)";
-	}
-
-	if (mainLedNeedsUpdate) {
-		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending Main LED command (changed)";
-		sendLED(mainLedValue, individualLuminosityFactor);
-	} else {
-		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping Main LED command (same value)";
-	}
-
-	if (pwmNeedsUpdate) {
-		ofLogNotice("LedMagnetController") << "ID " << id << " - Sending PWM command (changed)";
-		sendPWM(pwmValue);
-	} else {
-		ofLogVerbose("LedMagnetController") << "ID " << id << " - Skipping PWM command (same value)";
-	}
-
+	sendLED(r, g, b, blend, origin, arc, individualLuminosityFactor, true);
+	sendLED(mainLedValue, individualLuminosityFactor);
+	sendPWM(pwmValue);
 	return *this;
 }

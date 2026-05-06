@@ -93,10 +93,6 @@ public:
 	// OSC update flag
 	bool updatingFromOSC;
 
-	// For rate-limiting LED commands to hardware
-	float lastLedCommandSendTime;
-	static const float MIN_LED_COMMAND_INTERVAL_MS;
-
 	// Dirty flags for optimization
 	mutable bool ledParametersDirty = true;
 	mutable bool motorParametersDirty = true;
