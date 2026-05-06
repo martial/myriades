@@ -64,9 +64,6 @@ private:
 	// Connection settings
 	int receivePort;
 
-	// Process last commands in main thread
-	void processLastCommands();
-
 	// Message handlers
 	void handleConnectionMessage(ofxOscMessage & msg);
 	void handleMotorMessage(ofxOscMessage & msg);

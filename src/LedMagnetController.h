@@ -8,13 +8,6 @@
 
 class LedMagnetController {
 public:
-	// Control channel types
-	enum class ControlType : uint8_t {
-		LED = 1,
-		PWM = 2,
-		DOTSTAR = 3
-	};
-
 	// Connection result enum for better error handling
 	enum class ConnectionResult {
 		SUCCESS,
@@ -67,7 +60,6 @@ public:
 	static float getGlobalLuminosity();
 
 	// Generic send method
-	bool send(ControlType type, const std::vector<uint8_t> & data);
 	bool send(const std::vector<uint8_t> & data);
 
 	// Current protocol state

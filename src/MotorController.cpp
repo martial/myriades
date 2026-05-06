@@ -1,14 +1,6 @@
 #include "MotorController.h"
+#include "OSCHelper.h"
 #include "ofMath.h" // For ofMap
-#include <algorithm> // For std::min and std::max
-
-// Helper function for clamp
-namespace {
-template <typename T>
-const T & local_clamp(const T & value, const T & low, const T & high) {
-	return std::max(low, std::min(value, high));
-}
-}
 
 MotorController::MotorController() {
 	// OSC-only constructor - no serial port needed
@@ -88,7 +80,7 @@ MotorController & MotorController::enable(bool enabled_command) {
 }
 
 MotorController & MotorController::setMicrostep(int ustep) {
-	ustep = local_clamp(ustep, 1, 256);
+	ustep = OSCHelper::clamp(ustep, 1, 256);
 
 	if (microstepInitialized && ustep == lastMicrostepValue) {
 		return *this; // No change, don't send
@@ -111,10 +103,10 @@ MotorController & MotorController::emergencyStop() {
 }
 
 MotorController & MotorController::moveRelative(int speed, int accel /* 0-255 */, int axis) {
-	speed = local_clamp(speed, 0, 500);
+	speed = OSCHelper::clamp(speed, 0, 500);
 	// Accel is now 0-255, clamp it and cast to uint8_t for hardware
-	uint8_t hardwareAccel = static_cast<uint8_t>(local_clamp(accel, 0, 255));
-	axis = local_clamp(axis, -8388607, 8388607);
+	uint8_t hardwareAccel = static_cast<uint8_t>(OSCHelper::clamp(accel, 0, 255));
+	axis = OSCHelper::clamp(axis, -8388607, 8388607);
 
 	std::vector<uint8_t> data = { static_cast<uint8_t>(MotorCommand::MOVE_RELATIVE) };
 
@@ -135,10 +127,10 @@ MotorController & MotorController::moveRelative(int speed, int accel /* 0-255 */
 }
 
 MotorController & MotorController::moveAbsolute(int speed, int accel /* 0-255 */, int axis) {
-	speed = local_clamp(speed, 0, 500);
+	speed = OSCHelper::clamp(speed, 0, 500);
 	// Accel is now 0-255, clamp it and cast to uint8_t for hardware
-	uint8_t hardwareAccel = static_cast<uint8_t>(local_clamp(accel, 0, 255));
-	axis = local_clamp(axis, -8388607, 8388607);
+	uint8_t hardwareAccel = static_cast<uint8_t>(OSCHelper::clamp(accel, 0, 255));
+	axis = OSCHelper::clamp(axis, -8388607, 8388607);
 
 	std::vector<uint8_t> data = { static_cast<uint8_t>(MotorCommand::MOVE_ABSOLUTE) };
 
@@ -206,19 +198,6 @@ bool MotorController::send(const std::vector<uint8_t> & data) {
 		ofLogError("MotorController") << "Data too large (max 7 bytes): " << data.size();
 		return false;
 	}
-
-	// Log what we're sending including motor device ID
-	std::string dataStr = "";
-	for (size_t i = 0; i < data.size(); i++) {
-		if (i > 0) dataStr += " ";
-		dataStr += std::to_string(static_cast<int>(data[i]));
-	}
-	//ofLogNotice("MotorController") << "Motor ID " << id << " command processed for OSC-only: [" << dataStr << "]";
-
-	// Serial disabled - command processed for OSC-only operation
-
-	// Debug logging removed - no packet to log in OSC-only mode
-
 	return true;
 }
 

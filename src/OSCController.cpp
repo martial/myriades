@@ -31,7 +31,6 @@ void OSCController::update() {
 		receiver.getNextMessage(message);
 		processMessage(message);
 	}
-	processLastCommands();
 }
 
 void OSCController::shutdown() {
@@ -1050,20 +1049,6 @@ void OSCController::logOSCMessage(const ofxOscMessage & msg, const string & acti
 
 void OSCController::updateUIAngleParameters(float relativeAngle, float absoluteAngle) {
 	if (uiWrapper) uiWrapper->updatePositionParameters(relativeAngle, absoluteAngle);
-}
-
-void OSCController::processLastCommands() {
-	// The entire loop and logic for sending LED commands based on lastSentValues
-	// and comparing with hg->parameters or uiWrapper->parameters is now handled by
-	// HourGlass::applyLedParameters(), which is called every frame via UIWrapper::update().
-
-	// Therefore, the LED-related command sending logic in this function should be removed.
-
-	// If processLastCommands() had other responsibilities (e.g., for motor commands or other state sync)
-	// those would remain. For now, assuming it was primarily for LEDs based on its content.
-
-	// If there are no other tasks for processLastCommands, it can be left empty or eventually removed.
-	// For safety, let's leave it empty for now.
 }
 
 void OSCController::loadMotorPresets(const std::string & filename) {

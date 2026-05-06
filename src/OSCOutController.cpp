@@ -265,43 +265,33 @@ void OSCOutController::sendMessageToAll(const ofxOscMessage & message) {
 
 void OSCOutController::sendMessageToDestination(const ofxOscMessage & message, const OSCDestination & dest) {
 	auto it = senders.find(dest.name);
-	if (it != senders.end()) {
-		it->second->sendMessage(message);
+	if (it == senders.end()) return;
 
-		// Build arguments string
-		std::string argsStr = "";
-		if (message.getNumArgs() > 0) {
-			argsStr = " [";
-			for (int i = 0; i < message.getNumArgs(); i++) {
-				if (i > 0) argsStr += ", ";
+	it->second->sendMessage(message);
 
-				if (message.getArgType(i) == OFXOSC_TYPE_INT32) {
-					argsStr += std::to_string(message.getArgAsInt32(i));
-				} else if (message.getArgType(i) == OFXOSC_TYPE_FLOAT) {
-					argsStr += std::to_string(message.getArgAsFloat(i));
-				} else if (message.getArgType(i) == OFXOSC_TYPE_STRING) {
-					argsStr += "\"" + message.getArgAsString(i) + "\"";
-				} else {
-					argsStr += "?";
-				}
+	if (ofGetLogLevel("OSCOutController") > OF_LOG_VERBOSE) return;
+
+	std::string argsStr = "";
+	if (message.getNumArgs() > 0) {
+		argsStr = " [";
+		for (int i = 0; i < message.getNumArgs(); i++) {
+			if (i > 0) argsStr += ", ";
+
+			if (message.getArgType(i) == OFXOSC_TYPE_INT32) {
+				argsStr += std::to_string(message.getArgAsInt32(i));
+			} else if (message.getArgType(i) == OFXOSC_TYPE_FLOAT) {
+				argsStr += std::to_string(message.getArgAsFloat(i));
+			} else if (message.getArgType(i) == OFXOSC_TYPE_STRING) {
+				argsStr += "\"" + message.getArgAsString(i) + "\"";
+			} else {
+				argsStr += "?";
 			}
-			argsStr += "]";
 		}
-
-		ofLogNotice("OSCOutController") << "Sent OSC: " << message.getAddress() << argsStr
-										<< " → " << dest.name << " (" << dest.ip << ":" << dest.port << ")";
+		argsStr += "]";
 	}
-}
 
-std::string OSCOutController::buildMotorAddress(const std::string & command, int deviceId) {
-	if (deviceId >= 0) {
-		return "/motor/" + ofToString(deviceId) + "/" + command;
-	}
-	return "/motor/" + command;
-}
-
-std::string OSCOutController::buildDeviceAddress(const std::string & prefix, int deviceId) {
-	return prefix + "/" + ofToString(deviceId);
+	ofLogVerbose("OSCOutController") << "Sent OSC: " << message.getAddress() << argsStr
+									 << " → " << dest.name << " (" << dest.ip << ":" << dest.port << ")";
 }
 
 uint32_t OSCOutController::encodeRGBA(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) {

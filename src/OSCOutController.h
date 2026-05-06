@@ -73,8 +73,6 @@ private:
 	void sendMessageToDestination(const ofxOscMessage & message, const OSCDestination & dest);
 
 	// Message creation helpers
-	std::string buildMotorAddress(const std::string & command, int deviceId = -1);
-	std::string buildDeviceAddress(const std::string & prefix, int deviceId);
 	uint32_t encodeRGBA(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
 
 	// JSON helpers

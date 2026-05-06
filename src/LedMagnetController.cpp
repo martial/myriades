@@ -97,13 +97,11 @@ float LedMagnetController::getGlobalLuminosity() {
 LedMagnetController & LedMagnetController::sendLED(uint8_t value, float individualLuminosityFactor) { // Main LED
 	uint8_t modulatedValue = static_cast<uint8_t>(OSCHelper::clamp(static_cast<float>(value) * globalLuminosityValue * individualLuminosityFactor, 0.0f, 255.0f));
 
-	// Debug logging for Main LED issues
 	if (mainLedInitialized && modulatedValue == lastSentMainLED) {
-		ofLogVerbose("LedMagnetController") << "ID " << id << " - Main LED unchanged: " << (int)modulatedValue;
 		return *this;
 	}
 
-	ofLogNotice("LedMagnetController") << "ID " << id << " - Main LED changed: " << (int)lastSentMainLED << " → " << (int)modulatedValue;
+	ofLogVerbose("LedMagnetController") << "ID " << id << " - Main LED " << (int)lastSentMainLED << " → " << (int)modulatedValue;
 	send({ 1, modulatedValue });
 	lastSentMainLED = modulatedValue;
 	mainLedInitialized = true;
@@ -174,7 +172,7 @@ LedMagnetController & LedMagnetController::sendPWM(uint8_t value) { // PWM not a
 }
 
 LedMagnetController & LedMagnetController::sendDotStar(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness) {
-	send(ControlType::DOTSTAR, { r, g, b, brightness });
+	send({ r, g, b, brightness });
 	return *this;
 }
 
@@ -182,13 +180,7 @@ LedMagnetController & LedMagnetController::sendDotStar(const ofColor & color, ui
 	return sendDotStar(color.r, color.g, color.b, brightness);
 }
 
-bool LedMagnetController::send(ControlType type, const std::vector<uint8_t> & data) {
-	// ControlType no longer needed in OSC-only mode, just call standard send
-	return send(data);
-}
-
 bool LedMagnetController::send(const std::vector<uint8_t> & data) {
-	// Serial communication completely removed - just track timing for compatibility
 	float currentTime = ofGetElapsedTimef();
 	float timeSinceLastSend = currentTime - lastSendTime;
 
@@ -206,19 +198,8 @@ bool LedMagnetController::send(const std::vector<uint8_t> & data) {
 	}
 
 	lastSendTime = currentTime;
-
-	// Log command for debugging (OSC-only mode)
-	std::string dataStr = "";
-	for (size_t i = 0; i < data.size(); i++) {
-		if (i > 0) dataStr += " ";
-		dataStr += std::to_string(static_cast<int>(data[i]));
-	}
-	ofLogVerbose("LedMagnetController") << "OSC-only command ID " << id << ": [" << dataStr << "]";
-
 	return true;
 }
-
-// buildPacket method removed - no longer needed without serial communication
 
 // RGB optimization static variables
 uint8_t LedMagnetController::gammaLUT[256];

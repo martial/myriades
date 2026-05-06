@@ -196,21 +196,6 @@ void HourGlass::emergencyStop() {
 }
 
 void HourGlass::setAllLEDs(uint8_t r, uint8_t g, uint8_t b) {
-	// Only update parameters, let OSCController::processLastCommands or UI direct calls handle sending
-	// Throttling is removed here as direct sending is removed.
-	// The responsibility for throttling and actual hardware send is now with:
-	//  - UIWrapper listeners (for direct UI interaction)
-	//  - OSCController::processLastCommands (for state synchronization from parameters)
-
-	// bool wasUpdatingFromOSC = updatingFromOSC; // This flag is tricky here.
-	// If OSC calls this, updatingFromOSC should be true when params are set.
-	// If UI calls this (e.g. a preset button that uses setAllLEDs), it might be false.
-	// For now, let the caller manage the updatingFromOSC flag if necessary before calling this.
-
-	// It's crucial that if OSC is the origin of this call, 'updatingFromOSC' is true
-	// BEFORE ofParameters are set, so listeners in UIWrapper can ignore these changes if needed.
-	// OSCController::handleLedMessage for "/led/all/rgb" does set hg->updatingFromOSC = true;
-
 	upLedColor.set(ofColor(r, g, b));
 	downLedColor.set(ofColor(r, g, b));
 	// ofLogNotice("HourGlass") << name << " - Parameters set by setAllLEDs: R" << (int)r << " G" << (int)g << " B" << (int)b;

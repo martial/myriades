@@ -105,12 +105,6 @@ private:
 	// Build protocol packet (same as CAN protocol)
 	std::vector<uint8_t> buildPacket(const std::vector<uint8_t> & data) const;
 
-	// Helper functions
-	template <typename T>
-	static T clamp(T value, T min, T max) {
-		return value < min ? min : (value > max ? max : value);
-	}
-
 	// Convert multi-byte values to byte arrays
 	std::vector<uint8_t> speedToBytes(int speed) const;
 	std::vector<uint8_t> axisToBytes(int axis) const;
