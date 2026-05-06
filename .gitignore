@@ -103,6 +103,9 @@ $RECYCLE.BIN/
 # Node modules (if using any web tools)
 node_modules/
 
+# Claude Code local settings
+.claude/
+
 # OpenFrameworks specific
 addons/*/libs/
 
