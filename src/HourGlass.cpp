@@ -387,7 +387,7 @@ void HourGlass::applyLedParameters() {
 			uint8_t masterAlpha = static_cast<uint8_t>(finalUpIndividualLuminosity * 255.0f);
 			oscOutController->sendRGBLED("top", upParams.color.r, upParams.color.g, upParams.color.b,
 				masterAlpha, upParams.origin, upParams.arc);
-			
+
 			// Update RGB tracking
 			lastUpColor = upParams.color;
 			lastUpOrigin = upParams.origin;
@@ -445,7 +445,7 @@ void HourGlass::applyLedParameters() {
 			uint8_t masterAlpha = static_cast<uint8_t>(finalDownIndividualLuminosity * 255.0f);
 			oscOutController->sendRGBLED("bot", downParams.color.r, downParams.color.g, downParams.color.b,
 				masterAlpha, downParams.origin, downParams.arc);
-			
+
 			// Update RGB tracking
 			lastDownColor = downParams.color;
 			lastDownOrigin = downParams.origin;

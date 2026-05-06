@@ -3,7 +3,7 @@
 //--------------------------------------------------------------
 void ofApp::setup() {
 	ofSetWindowTitle("Myriades Control System v1.0");
-	ofSetFrameRate(60);
+	ofSetFrameRate(30);
 	ofSetWindowShape(1200, 800);
 
 	// Basic setup for smooth rendering
