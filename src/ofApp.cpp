@@ -15,8 +15,13 @@ void ofApp::setup() {
 	hourglassManager.loadConfiguration("hourglasses.json");
 	hourglassManager.connectAll();
 
+	// Sequencer playback goes through the same pipeline as network OSC
+	vezerPlayer.setMessageSink([this](ofxOscMessage & msg) {
+		oscController.processMessage(msg);
+	});
+
 	// Setup UI with references to core components
-	ui.setup(&hourglassManager, &oscController);
+	ui.setup(&hourglassManager, &oscController, &vezerPlayer);
 
 	// Initialize OSC controller
 	oscController.setup(8000); // Default receive port
@@ -28,6 +33,9 @@ void ofApp::setup() {
 void ofApp::update() {
 	// Update OSC controller (process incoming messages)
 	oscController.update();
+
+	// Advance sequencer playback (before the hardware tick in ui.update())
+	vezerPlayer.update(ofGetLastFrameTime());
 
 	// Update UI
 	ui.update();

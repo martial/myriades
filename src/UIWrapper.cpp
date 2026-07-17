@@ -19,14 +19,16 @@ UIWrapper::~UIWrapper() {
 	saveSettings();
 }
 
-void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl) {
+void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl, VezerPlayer * player) {
 	this->hourglassManager = manager;
 	this->oscControllerInstance = oscCtrl;
+	this->vezerPlayer = player;
 
 	currentHourGlass = 0;
 
 	// Setup all panels
 	setupPanels();
+	setupSequencerPanel();
 
 	// Setup all listeners
 	setupListeners();
@@ -60,6 +62,9 @@ void UIWrapper::update() {
 	// Update LED visualizer
 	ledVisualizer.update();
 
+	// Reflect sequencer playback state in the GUI
+	syncSequencerUI();
+
 	// Per-frame hardware tick: effects, LED sends, pending motor commands
 	if (hourglassManager) {
 		hourglassManager->update(ofGetLastFrameTime());
@@ -78,6 +83,9 @@ void UIWrapper::draw() {
 
 		// Draw enhanced status panel
 		drawStatus();
+
+		// Draw sequencer panel
+		sequencerPanel.draw();
 
 		// Draw LED visualizer at specified coordinates
 		int visualizerX = 980;
@@ -950,6 +958,13 @@ void UIWrapper::saveSettings() {
 	uiStateNode.setAttribute("globalLuminosity", ofToString(LedMagnetController::getGlobalLuminosity()));
 	uiStateNode.setAttribute("framerate", ofToString(framerateParam.get()));
 	uiStateNode.setAttribute("syncColors", syncColorsParam.get() ? "true" : "false");
+
+	// Sequencer state: reload the same XML/scene (and resume playback) on next launch
+	uiStateNode.setAttribute("vezerXmlPath", (vezerPlayer && vezerPlayer->isLoaded()) ? vezerPlayer->getPath() : "");
+	uiStateNode.setAttribute("vezerScene", ofToString(vezerPlayer ? vezerPlayer->getCompositionIndex() : 0));
+	uiStateNode.setAttribute("vezerLoop", (vezerPlayer && vezerPlayer->getLoop()) ? "true" : "false");
+	uiStateNode.setAttribute("vezerPlaying", (vezerPlayer && vezerPlayer->isPlaying()) ? "true" : "false");
+
 	uiStateConfig.save("ui_state.xml");
 
 	// === Save Per-HourGlass Settings ===
@@ -997,6 +1012,21 @@ void UIWrapper::loadSettings() {
 			if (savedSelection >= 0 && savedSelection < hourglassManager->getHourGlassCount()) {
 				currentHourGlass = savedSelection;
 				hourglassSelectorParam.set(currentHourGlass + 1);
+			}
+
+			// Restore the sequencer: reload XML, scene, loop, and resume if it was playing
+			std::string vezerPath = uiStateNode.getAttribute("vezerXmlPath").getValue();
+			if (!vezerPath.empty() && vezerPlayer && ofFile::doesFileExist(vezerPath, false)) {
+				if (vezerPlayer->load(vezerPath)) {
+					vezerPlayer->selectComposition(ofToInt(uiStateNode.getAttribute("vezerScene").getValue()));
+					vezerPlayer->setLoop(uiStateNode.getAttribute("vezerLoop").getValue() == "true");
+					if (uiStateNode.getAttribute("vezerPlaying").getValue() == "true") {
+						vezerPlayer->play();
+					}
+					rebuildSequencerPanel();
+				}
+			} else if (!vezerPath.empty()) {
+				ofLogWarning("UIWrapper") << "Saved Vezer XML no longer exists: " << vezerPath;
 			}
 		}
 	}
@@ -1099,4 +1129,115 @@ void UIWrapper::onSetZeroAllPressed() {
 	if (hourglassManager) {
 		hourglassManager->setZeroAll();
 	}
+}
+
+// --- Vezér sequencer GUI ---
+
+void UIWrapper::setupSequencerPanel() {
+	setupStyledPanel(sequencerPanel, "SEQUENCER (VEZER)", "sequencer.xml", 980, 240);
+
+	seqCompParam.set("Scene", 1, 1, 1);
+	seqPlayParam.set("Play", false);
+	seqLoopParam.set("Loop", false);
+	seqPositionParam.set("Position", 0.0f, 0.0f, 1.0f);
+
+	// Setup widgets ONCE, before listeners: ofxButton::setup() fires the
+	// button's parameter event, which would open the load dialog mid-setup.
+	seqLoadBtn.setup("Load Vezer XML...");
+	seqFileLabel.setup("File", "none loaded");
+	seqCompNameLabel.setup("Name", "");
+	seqTimeLabel.setup("Time", "0.0 / 0.0 s");
+
+	seqLoadBtn.addListener(this, &UIWrapper::onSeqLoadPressed);
+	seqCompParam.addListener(this, &UIWrapper::onSeqCompositionChanged);
+	seqPlayParam.addListener(this, &UIWrapper::onSeqPlayChanged);
+	seqLoopParam.addListener(this, &UIWrapper::onSeqLoopChanged);
+	seqPositionParam.addListener(this, &UIWrapper::onSeqPositionChanged);
+
+	rebuildSequencerPanel();
+}
+
+void UIWrapper::rebuildSequencerPanel() {
+	sequencerPanel.clear();
+	sequencerPanel.add(&seqLoadBtn);
+
+	if (!vezerPlayer || !vezerPlayer->isLoaded()) {
+		seqFileLabel = "none loaded";
+		sequencerPanel.add(&seqFileLabel);
+		return;
+	}
+
+	seqFileLabel = ofFilePath::getFileName(vezerPlayer->getPath());
+	sequencerPanel.add(&seqFileLabel);
+
+	isSyncingSequencerUI = true;
+	seqCompParam.setMin(1);
+	seqCompParam.setMax(vezerPlayer->getCompositionCount());
+	seqCompParam.set(vezerPlayer->getCompositionIndex() + 1);
+	seqLoopParam.set(vezerPlayer->getLoop());
+	seqPlayParam.set(vezerPlayer->isPlaying());
+	isSyncingSequencerUI = false;
+
+	sequencerPanel.add(seqCompParam);
+	sequencerPanel.add(&seqCompNameLabel);
+	sequencerPanel.add(seqPlayParam);
+	sequencerPanel.add(seqLoopParam);
+	sequencerPanel.add(seqPositionParam);
+	sequencerPanel.add(&seqTimeLabel);
+}
+
+void UIWrapper::syncSequencerUI() {
+	if (!vezerPlayer || !vezerPlayer->isLoaded()) return;
+	const VezerPlayer::Composition * comp = vezerPlayer->getCurrent();
+	if (!comp) return;
+
+	isSyncingSequencerUI = true;
+	// Playback can stop on its own at the end of a scene
+	if (seqPlayParam.get() != vezerPlayer->isPlaying()) seqPlayParam.set(vezerPlayer->isPlaying());
+	if (seqLoopParam.get() != vezerPlayer->getLoop()) seqLoopParam.set(vezerPlayer->getLoop());
+	if (seqCompParam.get() != vezerPlayer->getCompositionIndex() + 1) seqCompParam.set(vezerPlayer->getCompositionIndex() + 1);
+	seqPositionParam.set(vezerPlayer->getPositionNormalized());
+	isSyncingSequencerUI = false;
+
+	seqCompNameLabel = comp->name + (comp->enabled ? "" : " [off]");
+	seqTimeLabel = ofToString(vezerPlayer->getPositionSeconds(), 1) + " / "
+		+ ofToString(comp->durationSeconds(), 1) + " s  ("
+		+ ofToString((int)comp->fps) + "fps, " + ofToString(comp->playableTrackCount) + " trk)";
+}
+
+void UIWrapper::onSeqLoadPressed() {
+	ofFileDialogResult result = ofSystemLoadDialog("Select a Vezer XML export");
+	if (!result.bSuccess) return;
+
+	if (vezerPlayer && vezerPlayer->load(result.getPath())) {
+		rebuildSequencerPanel();
+	} else {
+		ofLogError("UIWrapper") << "Failed to load Vezer XML: " << result.getPath();
+	}
+}
+
+void UIWrapper::onSeqCompositionChanged(int & index) {
+	if (isSyncingSequencerUI || !vezerPlayer || !vezerPlayer->isLoaded()) return;
+	bool wasPlaying = vezerPlayer->isPlaying();
+	vezerPlayer->selectComposition(index - 1);
+	if (wasPlaying) vezerPlayer->play(); // keep running when switching scenes live
+}
+
+void UIWrapper::onSeqPlayChanged(bool & play) {
+	if (isSyncingSequencerUI || !vezerPlayer) return;
+	if (play) {
+		vezerPlayer->play();
+	} else {
+		vezerPlayer->stop();
+	}
+}
+
+void UIWrapper::onSeqLoopChanged(bool & loop) {
+	if (isSyncingSequencerUI || !vezerPlayer) return;
+	vezerPlayer->setLoop(loop);
+}
+
+void UIWrapper::onSeqPositionChanged(float & position) {
+	if (isSyncingSequencerUI || !vezerPlayer || !vezerPlayer->isLoaded()) return;
+	vezerPlayer->seekNormalized(position);
 }

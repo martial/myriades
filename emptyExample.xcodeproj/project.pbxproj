@@ -19,6 +19,7 @@
 		1440A9ED2DE99FE000D8473C /* EffectsManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9D22DE99FE000D8473C /* EffectsManager.cpp */; };
 		1440A9EE2DE99FE000D8473C /* OSCController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9DF2DE99FE000D8473C /* OSCController.cpp */; };
 		1440A9EF2DE99FE000D8473C /* HourGlass.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9D52DE99FE000D8473C /* HourGlass.cpp */; };
+		AA10000000000000000000A1 /* VezerPlayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000B1 /* VezerPlayer.cpp */; };
 		1440A9F02DE99FE000D8473C /* LedMagnetController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9D92DE99FE000D8473C /* LedMagnetController.cpp */; };
 		"1D654710-7951-4164-B2FD-7176AF3BD2B6" /* ofxSlider.cpp in Sources */ = {isa = PBXBuildFile; fileRef = "6AC325E9-303C-449E-979C-B2C31B5298D3" /* ofxSlider.cpp */; };
 		"1F0132A9-51F5-4CAB-8F07-D62A4548D847" /* ofxOscSender.cpp in Sources */ = {isa = PBXBuildFile; fileRef = "0177C4D0-5FE2-4AD8-9D60-CC4630B72C91" /* ofxOscSender.cpp */; };
@@ -110,6 +111,9 @@
 		1440A9D32DE99FE000D8473C /* GuiController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GuiController.h; sourceTree = "<group>"; };
 		1440A9D42DE99FE000D8473C /* HourGlass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HourGlass.h; sourceTree = "<group>"; };
 		1440A9D52DE99FE000D8473C /* HourGlass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = HourGlass.cpp; sourceTree = "<group>"; };
+		AA10000000000000000000B1 /* VezerPlayer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = VezerPlayer.cpp; sourceTree = "<group>"; };
+		AA10000000000000000000B2 /* VezerPlayer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VezerPlayer.h; sourceTree = "<group>"; };
+		AA10000000000000000000B3 /* LedGeometry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LedGeometry.h; sourceTree = "<group>"; };
 		1440A9D62DE99FE000D8473C /* HourGlassManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HourGlassManager.h; sourceTree = "<group>"; };
 		1440A9D72DE99FE000D8473C /* HourGlassManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = HourGlassManager.cpp; sourceTree = "<group>"; };
 		1440A9D82DE99FE000D8473C /* LedMagnetController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LedMagnetController.h; sourceTree = "<group>"; };
@@ -603,6 +607,9 @@
 				1440A9D32DE99FE000D8473C /* GuiController.h */,
 				1440A9D42DE99FE000D8473C /* HourGlass.h */,
 				1440A9D52DE99FE000D8473C /* HourGlass.cpp */,
+				AA10000000000000000000B1 /* VezerPlayer.cpp */,
+				AA10000000000000000000B2 /* VezerPlayer.h */,
+				AA10000000000000000000B3 /* LedGeometry.h */,
 				1440A9D62DE99FE000D8473C /* HourGlassManager.h */,
 				1440A9D72DE99FE000D8473C /* HourGlassManager.cpp */,
 				1440A9D82DE99FE000D8473C /* LedMagnetController.h */,
@@ -778,6 +785,7 @@
 				1440A9ED2DE99FE000D8473C /* EffectsManager.cpp in Sources */,
 				1440A9EE2DE99FE000D8473C /* OSCController.cpp in Sources */,
 				1440A9EF2DE99FE000D8473C /* HourGlass.cpp in Sources */,
+				AA10000000000000000000A1 /* VezerPlayer.cpp in Sources */,
 				1440A9F02DE99FE000D8473C /* LedMagnetController.cpp in Sources */,
 				"F6E13513-02AC-4920-8EC3-387131BFADB2" /* ofxGuiGroup.cpp in Sources */,
 				"772914D5-8C84-4E02-BF9A-AE9380F9DEE9" /* ofxInputField.cpp in Sources */,

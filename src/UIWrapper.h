@@ -3,6 +3,7 @@
 #include "ArcCosineEffect.h"
 #include "HourGlassManager.h"
 #include "LEDVisualizer.h"
+#include "VezerPlayer.h"
 #include "ofMain.h"
 #include "ofxGui.h"
 #include <functional>
@@ -21,7 +22,7 @@ public:
 	~UIWrapper();
 
 	// Main UI lifecycle
-	void setup(HourGlassManager * manager, OSCController * oscCtrl);
+	void setup(HourGlassManager * manager, OSCController * oscCtrl, VezerPlayer * player);
 	void update();
 	void draw();
 
@@ -181,6 +182,29 @@ private:
 	// NEW METHODS: Fix for hourglass selection bug
 	void updateUIPanelsBinding();
 	void updateListenersForCurrentHourglass();
+
+	// --- Vezér sequencer (XML OSC playback) ---
+	VezerPlayer * vezerPlayer = nullptr;
+	bool isSyncingSequencerUI = false; // Guard: GUI updated FROM player state
+
+	ofxPanel sequencerPanel;
+	ofxButton seqLoadBtn;
+	ofxLabel seqFileLabel;
+	ofParameter<int> seqCompParam; // 1-based scene selector
+	ofxLabel seqCompNameLabel;
+	ofParameter<bool> seqPlayParam;
+	ofParameter<bool> seqLoopParam;
+	ofParameter<float> seqPositionParam; // normalized 0..1, draggable to seek
+	ofxLabel seqTimeLabel;
+
+	void setupSequencerPanel();
+	void rebuildSequencerPanel(); // after a file is (re)loaded
+	void syncSequencerUI(); // reflect player state each frame
+	void onSeqLoadPressed();
+	void onSeqCompositionChanged(int & index);
+	void onSeqPlayChanged(bool & play);
+	void onSeqLoopChanged(bool & loop);
+	void onSeqPositionChanged(float & position);
 
 	// Helper for setting up common panel properties
 	void setupStyledPanel(ofxPanel & panel, const std::string & panelName, const std::string & settingsFilename, float x, float y);
