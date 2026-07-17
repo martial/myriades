@@ -40,7 +40,8 @@ public:
 	// OSC activity tracking
 	void notifyOSCMessageReceived();
 
-	// XML save/load for persistence
+	// XML save/load for persistence (guarded: a filesystem error - e.g. macOS
+	// denying folder access - must not crash the app)
 	void saveSettings();
 	void loadSettings();
 
@@ -51,10 +52,9 @@ public:
 	// LED Visualizer access
 	LEDVisualizer & getLEDVisualizer() { return ledVisualizer; }
 
-	// Status section drawing helpers
-	void drawStatusSection_HourglassInfo(HourGlass * hg, float x, float & y, float lineHeight, float sectionWidth);
-	void drawStatusSection_KeyboardShortcuts(float x, float & y, float lineHeight, float sectionWidth);
-	void drawStatusSection_OSC(float x, float & y, float lineHeight);
+	// Window / mouse plumbing (layout reacts to resizes, E-stop is a custom-drawn button)
+	void windowResized(int w, int h);
+	bool handleMousePressed(int x, int y);
 
 	// Global Luminosity Panel and Parameters (public for access if needed, though typically managed internally)
 	ofxPanel globalSettingsPanel; // Panel to hold global settings like luminosity
@@ -84,7 +84,9 @@ private:
 	ofxPanel effectsPanel; // New panel for effects
 
 	// Parameters for UI elements (will be added to panels)
-	ofParameter<int> hourglassSelectorParam;
+	ofParameter<int> hourglassSelectorParam; // selection state; driven by the HG buttons + keyboard
+	std::vector<ofParameter<void>> hgSelectParams; // one button per hourglass
+	std::vector<std::unique_ptr<of::priv::AbstractEventToken>> hgSelectListeners;
 	ofParameter<int> framerateParam;
 	ofParameter<void> connectBtnParam;
 	ofParameter<void> disconnectBtnParam;
@@ -155,8 +157,19 @@ private:
 	void onDownLedOriginChanged(int & value);
 	void onDownLedArcChanged(int & value);
 
-	// Status display
-	void drawStatus();
+	// Chrome: status bar, stop-all button, shortcuts overlay
+	void layoutPanels();
+	void selectHourglass(int index);
+	void stopAllMotors();
+	void drawStatusBar();
+	void drawEStop();
+	void drawShortcutsOverlay();
+
+	ofRectangle eStopRect;
+	float lastEStopTime = -10.0f; // for the press flash
+	bool shortcutsVisible = false;
+	ofTrueTypeFont statusFont; // real TTF for custom-drawn chrome (ofxGui has its own)
+	ofTrueTypeFont estopFont;
 
 	// Keyboard command handlers
 	void handleHourGlassSelection(int key);
@@ -212,4 +225,6 @@ private:
 	// Helpers for XML serialization
 	void saveHourGlassToXml(ofXml & hgNode, HourGlass * hg, int hgIndex);
 	void loadHourGlassFromXml(const ofXml & hgNode, HourGlass * hg, int hgIndex);
+	void saveSettingsImpl();
+	void loadSettingsImpl();
 };

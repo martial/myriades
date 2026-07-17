@@ -17,6 +17,9 @@ public:
 	// Set UIWrapper reference to access the current hourglass selection
 	void setUIWrapper(class UIWrapper * uiWrapper);
 
+	// Optional TTF for labels (falls back to bitmap font)
+	void setLabelFont(const ofTrueTypeFont * font) { labelFont = font; }
+
 	// Configuration
 	void setSize(int width, int height);
 	void setBackgroundColor(const ofColor & color);
@@ -32,8 +35,8 @@ public:
 	void setLayoutMode(int mode); // 0=grid, 1=horizontal, 2=vertical
 	void setControllerSpacing(float spacing);
 
-	// Compact preview controller
-	void drawTinyController(float x, float y, const ofColor & rgbColor,
+	// Ring preview of one controller, scaled by baseRadius (outer ring)
+	void drawTinyController(float x, float y, float baseRadius, const ofColor & rgbColor,
 		int blend, int origin, int arc, float globalLum, float individualLum);
 
 private:
@@ -47,6 +50,7 @@ private:
 
 	// UI selection access
 	class UIWrapper * uiWrapper;
+	const ofTrueTypeFont * labelFont = nullptr;
 
 	// Tracked hourglasses
 	struct HourGlassVisualization {

@@ -6,6 +6,41 @@
 // OSC activity tracking constants
 const float UIWrapper::OSC_ACTIVITY_FADE_TIME = 1.5f; // Dot visible for 1.5 seconds
 
+// --- Layout & palette ("control-room amber") ---
+// All positions derive from these + the window size; layoutPanels() is the only
+// place that positions panels, so windowResized() can just call it again.
+namespace {
+constexpr int kMargin = 15;
+constexpr int kSpacing = 12;
+constexpr int kPanelWidth = 225;
+constexpr int kPanelY = 20;
+constexpr int kContentTop = 500; // below the tallest top panel (16-row MOTOR)
+constexpr int kSequencerWidth = 300;
+constexpr int kStatusBarHeight = 34;
+constexpr int kEStopWidth = 140;
+constexpr int kEStopHeight = 64;
+
+const ofColor kPanelBg(16, 18, 22, 215);
+const ofColor kHeaderBg(28, 32, 40, 235);
+const ofColor kFillAmber(196, 134, 43, 190);
+const ofColor kBorder(42, 47, 55, 200);
+const ofColor kInk(233, 230, 222);
+const ofColor kMuted(144, 150, 160);
+const ofColor kAmber(226, 161, 60);
+const ofColor kOk(83, 179, 107);
+const ofColor kDanger(229, 72, 77);
+
+// Medium weight + a larger raster size read far better than thin/10px: OF
+// 0.12.1's ofxGui rasterizes TTF glyphs at logical size and the Retina
+// framebuffer magnifies them 2x, so heavier ink and more source detail per
+// glyph are the only real levers on perceived sharpness.
+constexpr const char * kFontPath = "fonts/JetBrainsMono-Medium.ttf";
+
+int panelX(int col) {
+	return kMargin + col * (kPanelWidth + kSpacing);
+}
+}
+
 UIWrapper::UIWrapper()
 	: currentViewMode(DETAILED_VIEW)
 	, oscControllerInstance(nullptr)
@@ -26,6 +61,23 @@ void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl, Vezer
 
 	currentHourGlass = 0;
 
+	// Global ofxGui style - must run before any panel/widget setup.
+	// Full character set brings the ° glyph the bitmap font silently dropped.
+	if (ofFile::doesFileExist(kFontPath)) {
+		ofxBaseGui::loadFont(kFontPath, 13, true, true);
+		statusFont.load(kFontPath, 13, true, true);
+		estopFont.load(kFontPath, 16, true, true);
+	} else {
+		ofLogWarning("UIWrapper") << kFontPath << " missing - falling back to bitmap font";
+	}
+	ofxBaseGui::setDefaultWidth(kPanelWidth);
+	ofxBaseGui::setDefaultHeight(24); // room for the 13px face
+	ofxBaseGui::setDefaultBackgroundColor(kPanelBg);
+	ofxBaseGui::setDefaultHeaderBackgroundColor(kHeaderBg);
+	ofxBaseGui::setDefaultFillColor(kFillAmber);
+	ofxBaseGui::setDefaultTextColor(kInk);
+	ofxBaseGui::setDefaultBorderColor(kBorder);
+
 	// Setup all panels
 	setupPanels();
 	setupSequencerPanel();
@@ -33,12 +85,14 @@ void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl, Vezer
 	// Setup all listeners
 	setupListeners();
 
-	// Setup LED visualizer - small preview below luminosity panel
-	ledVisualizer.setup(200, 120); // Bigger size
-	ledVisualizer.setLayoutMode(0); // Grid layout
-	ledVisualizer.setShowLabels(false); // No labels for compact view
+	// Setup LED visualizer - hero preview in the zone below the panels,
+	// sized every frame from the window in draw()
+	ledVisualizer.setup(600, 300);
+	ledVisualizer.setLayoutMode(0);
+	ledVisualizer.setShowLabels(true);
 	ledVisualizer.setShowGrid(false);
 	ledVisualizer.setUIWrapper(this); // Give visualizer access to the current selection
+	ledVisualizer.setLabelFont(&statusFont);
 
 	// Add all hourglasses to visualizer
 	for (int i = 0; i < hourglassManager->getHourGlassCount(); i++) {
@@ -56,6 +110,24 @@ void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl, Vezer
 
 	// CRITICAL FIX: Set up initial UI panel bindings for the first hourglass
 	updateUIPanelsBinding();
+
+	// Position everything for the current window size
+	layoutPanels();
+}
+
+void UIWrapper::layoutPanels() {
+	settingsPanel.setPosition(panelX(0), kPanelY);
+	motorPanel.setPosition(panelX(1), kPanelY);
+	ledUpPanel.setPosition(panelX(2), kPanelY);
+	ledDownPanel.setPosition(panelX(3), kPanelY);
+	luminosityPanel.setPosition(panelX(4), kPanelY);
+	effectsPanel.setPosition(panelX(5), kPanelY);
+	sequencerPanel.setPosition(ofGetWidth() - kMargin - kSequencerWidth, kContentTop);
+	eStopRect.set(ofGetWidth() - kMargin - kEStopWidth, kPanelY, kEStopWidth, kEStopHeight);
+}
+
+void UIWrapper::windowResized(int, int) {
+	layoutPanels();
 }
 
 void UIWrapper::update() {
@@ -80,17 +152,20 @@ void UIWrapper::draw() {
 		ledDownPanel.draw();
 		luminosityPanel.draw();
 		effectsPanel.draw();
-
-		// Draw enhanced status panel
-		drawStatus();
-
-		// Draw sequencer panel
 		sequencerPanel.draw();
 
-		// Draw LED visualizer at specified coordinates
-		int visualizerX = 980;
-		int visualizerY = 90;
-		ledVisualizer.draw(visualizerX, visualizerY);
+		// Hero live preview: fills the zone between the panels and the status
+		// bar, leaving the right column to the sequencer
+		float vizW = ofGetWidth() - kMargin * 2 - kSequencerWidth - kSpacing;
+		float vizH = ofGetHeight() - kContentTop - kStatusBarHeight - kMargin - 8;
+		ledVisualizer.setSize(vizW, vizH);
+		ledVisualizer.draw(kMargin, kContentTop);
+
+		drawEStop();
+		drawStatusBar();
+		if (shortcutsVisible) {
+			drawShortcutsOverlay();
+		}
 	} else if (currentViewMode == MINIMAL_VIEW) {
 		drawMinimalView();
 	}
@@ -122,30 +197,34 @@ void UIWrapper::drawMinimalView() {
 }
 
 // --- Helper method for styled panel setup ---
+// (style itself is global, set once in setup())
 void UIWrapper::setupStyledPanel(ofxPanel & panel, const std::string & panelName, const std::string & settingsFilename, float x, float y) {
 	panel.setup(panelName, settingsFilename, x, y);
-	panel.setDefaultBackgroundColor(ofColor(20, 20, 20, 180));
-	panel.setDefaultFillColor(ofColor(60, 60, 60, 160));
-	panel.setDefaultHeaderBackgroundColor(ofColor(40, 40, 40, 200));
-	panel.setDefaultTextColor(ofColor(255, 255, 255));
 }
 
 void UIWrapper::setupPanels() {
-	// Calculate panel dimensions for 5 horizontal panels - made even more compact
-	int panelWidth = 225;
-	int panelSpacing = 15;
-	int startX = 15;
-	int startY = 20;
+	// Six panels across the top; layoutPanels() owns the final positions
+	int startY = kPanelY;
 
-	// === PANEL 1: SETTINGS & ACTIONS (Left) ===
-	setupStyledPanel(settingsPanel, "SETTINGS & ACTIONS", "settings_actions.xml", startX, startY);
+	// === PANEL 1: GLOBAL (Left) ===
+	setupStyledPanel(settingsPanel, "GLOBAL", "settings_actions.xml", panelX(0), startY);
 
 	// --- Settings Section ---
+	// Selection state (not shown as a slider; driven by the HG buttons below and keys 1-9)
 	hourglassSelectorParam.set("Select HourGlass", 1, 1, hourglassManager->getHourGlassCount() > 0 ? hourglassManager->getHourGlassCount() : 2);
 	connectBtnParam.set("Connect All");
 	disconnectBtnParam.set("Disconnect All");
 
-	settingsPanel.add(hourglassSelectorParam);
+	// One button per hourglass; the selected one is echoed in every panel header
+	// and in the status bar
+	int hgCount = std::max(1, (int)hourglassManager->getHourGlassCount());
+	hgSelectParams.resize(hgCount);
+	for (int i = 0; i < hgCount; i++) {
+		hgSelectParams[i].set("Edit HG " + ofToString(i + 1));
+		settingsPanel.add(hgSelectParams[i]);
+		hgSelectListeners.push_back(hgSelectParams[i].newListener([this, i]() { selectHourglass(i); }));
+	}
+
 	connectBtn.setup(connectBtnParam.getName());
 	disconnectBtn.setup(disconnectBtnParam.getName());
 	settingsPanel.add(&connectBtn);
@@ -176,7 +255,7 @@ void UIWrapper::setupPanels() {
 	settingsPanel.add(&setZeroAllBtn);
 
 	// === PANEL 2: MOTOR (Center-Left) ===
-	setupStyledPanel(motorPanel, "MOTOR", "motor.xml", startX + (panelWidth + panelSpacing) * 1, startY);
+	setupStyledPanel(motorPanel, "MOTOR", "motor.xml", panelX(1), startY);
 
 	emergencyStopBtnParam.set("Emergency Stop");
 	setZeroBtnParam.set("Set Zero");
@@ -203,25 +282,25 @@ void UIWrapper::setupPanels() {
 	moveRelativeAngleBtn.setup(moveRelativeAngleBtnParam.getName());
 	moveAbsoluteAngleBtn.setup(moveAbsoluteAngleBtnParam.getName());
 
-	// === PANEL 3: UP LED CONTROLLER (Center) ===
-	setupStyledPanel(ledUpPanel, "UP LED CONTROLLER", "led_up.xml", startX + (panelWidth + panelSpacing) * 2, startY);
+	// === PANEL 3: UP LED (Center) ===
+	setupStyledPanel(ledUpPanel, "UP LED", "led_up.xml", panelX(2), startY);
 
 	// NOTE: LED panel contents will be populated by updateUIPanelsBinding()
 
-	// === PANEL 4: DOWN LED CONTROLLER (Center-Right) ===
-	setupStyledPanel(ledDownPanel, "DOWN LED CONTROLLER", "led_down.xml", startX + (panelWidth + panelSpacing) * 3, startY);
+	// === PANEL 4: DOWN LED (Center-Right) ===
+	setupStyledPanel(ledDownPanel, "DOWN LED", "led_down.xml", panelX(3), startY);
 
 	// NOTE: LED panel contents will be populated by updateUIPanelsBinding()
 
-	// === PANEL 5: MODULE LUMINOSITY (Right) ===
-	setupStyledPanel(luminosityPanel, "MODULE LUMINOSITY", "luminosity.xml", startX + (panelWidth + panelSpacing) * 4, startY);
+	// === PANEL 5: MODULE (Right) ===
+	setupStyledPanel(luminosityPanel, "MODULE", "luminosity.xml", panelX(4), startY);
 
 	// Sync Controls for LED Controllers
 	syncColorsParam.set("Sync Controllers", false);
 	luminosityPanel.add(syncColorsParam);
 
 	// Individual Luminosity for current module (shared between Up/Down controllers)
-	currentHgIndividualLuminosityParam.set("Module Individual Luminosity", 1.0f, 0.0f, 1.0f);
+	currentHgIndividualLuminosityParam.set("Module Luminosity", 1.0f, 0.0f, 1.0f);
 	if (hourglassManager->getHourGlassCount() > 0) {
 		auto * hg = hourglassManager->getHourGlass(0);
 		if (hg) {
@@ -231,12 +310,11 @@ void UIWrapper::setupPanels() {
 	currentHgIndividualLuminositySlider.setup(currentHgIndividualLuminosityParam);
 	luminosityPanel.add(&currentHgIndividualLuminositySlider);
 
-	// === PANEL 6: EFFECTS (New) ===
-	int effectsPanelX = startX + (panelWidth + panelSpacing) * 5;
-	setupStyledPanel(effectsPanel, "EFFECTS", "effects.xml", effectsPanelX, startY);
+	// === PANEL 6: EFFECTS ===
+	setupStyledPanel(effectsPanel, "EFFECTS", "effects.xml", panelX(5), startY);
 
-	addCosineArcEffectBtn.setup("Add Cosine Arc Effect");
-	clearAllEffectsBtn.setup("Clear All Effects");
+	addCosineArcEffectBtn.setup("Add Arc Effect");
+	clearAllEffectsBtn.setup("Clear Effects");
 
 	effectsPanel.add(&addCosineArcEffectBtn);
 	effectsPanel.add(&clearAllEffectsBtn);
@@ -280,103 +358,168 @@ void UIWrapper::setupListeners() {
 	setZeroAllBtn.addListener(this, &UIWrapper::onSetZeroAllPressed);
 }
 
-// --- Helper methods for drawing status sections ---
-void UIWrapper::drawStatusSection_HourglassInfo(HourGlass * hg, float x, float & y, float lineHeight, float sectionWidth) {
-	ofSetColor(255);
-	ofDrawBitmapString("HOURGLASS STATUS", x, y);
-	y += lineHeight * 1.5f; // Space after title
+// --- Chrome: status bar, stop-all button, shortcuts overlay ---
+
+// Draws with statusFont when loaded, bitmap font otherwise; returns text width
+static float drawChromeText(const ofTrueTypeFont & font, const std::string & text, float x, float y) {
+	if (font.isLoaded()) {
+		font.drawString(text, x, y);
+		return font.stringWidth(text);
+	}
+	ofDrawBitmapString(text, x, y);
+	return text.size() * 8.0f;
+}
+
+void UIWrapper::drawStatusBar() {
+	const float h = kStatusBarHeight;
+	const float y = ofGetHeight() - h - 10;
+	const float x = kMargin;
+	const float w = ofGetWidth() - kMargin * 2;
+
+	ofSetColor(kPanelBg);
+	ofDrawRectRounded(x, y, w, h, 6);
+
+	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
+	const float textY = y + h * 0.5f + 4;
+	float tx = x + 14;
 
 	if (hg) {
-		ofSetColor(220, 220, 220);
-		ofDrawBitmapString("HG " + ofToString(currentHourGlass + 1) + ": " + hg->getName(), x, y);
-		y += lineHeight;
-		ofDrawBitmapString(std::string("Status: ") + (hg->isConnected() ? "Connected" : "Disconnected"), x, y);
-		y += lineHeight;
-		ofSetColor(hg->motorEnabled.get() ? ofColor::green : ofColor::red);
-		ofDrawBitmapString(std::string("Motor: ") + (hg->motorEnabled.get() ? "Enabled" : "Disabled"), x, y);
-		y += lineHeight * 1.5f; // Extra space after HG info
+		// Live color swatch of the module being edited
+		ofSetColor(hg->upLedColor.get());
+		ofDrawRectRounded(tx, y + h * 0.5f - 6, 12, 12, 3);
+		tx += 20;
+
+		ofSetColor(kInk);
+		tx += drawChromeText(statusFont, "EDITING HG " + ofToString(currentHourGlass + 1) + " · " + hg->getName(), tx, textY) + 24;
+
+		ofSetColor(hg->isConnected() ? kOk : kDanger);
+		tx += drawChromeText(statusFont, hg->isConnected() ? "CONNECTED" : "DISCONNECTED", tx, textY) + 24;
+
+		ofSetColor(hg->motorEnabled.get() ? kOk : kMuted);
+		tx += drawChromeText(statusFont, hg->motorEnabled.get() ? "MOTOR ON" : "MOTOR OFF", tx, textY) + 24;
 	} else {
-		ofSetColor(ofColor::orangeRed);
-		ofDrawBitmapString("No HourGlass selected or available.", x, y);
-		y += lineHeight * 1.5f;
+		ofSetColor(kDanger);
+		tx += drawChromeText(statusFont, "NO HOURGLASS AVAILABLE", tx, textY) + 24;
 	}
-}
 
-void UIWrapper::drawStatusSection_KeyboardShortcuts(float x, float & y, float lineHeight, float sectionWidth) {
-	ofSetColor(100);
-	ofDrawLine(x, y, x + sectionWidth, y); // Separator line
-	y += lineHeight * 1.5f; // Space after separator
+	// Right side: OSC activity + shortcuts hint
+	float rx = x + w - 14;
+	const std::string hint = "?  SHORTCUTS";
+	float hintW = statusFont.isLoaded() ? statusFont.stringWidth(hint) : hint.size() * 8.0f;
+	rx -= hintW;
+	ofSetColor(kMuted);
+	drawChromeText(statusFont, hint, rx, textY);
 
-	ofSetColor(220, 220, 220);
-	ofDrawBitmapString("Keyboard Shortcuts:", x, y);
-	y += lineHeight; // Start shortcuts on the next line
-
-	static const char * const shortcuts[] = {
-		"1-2: Select HG", "c/x: Connect/Disconnect",
-		"z: Zero Motor", "s: Stop Motor (Emerg.)",
-		"Arrows: Rotate Motor", "u/d: Move Steps (Rel)"
-	};
-	for (const char * shortcut : shortcuts) {
-		ofDrawBitmapString(shortcut, x, y);
-		y += lineHeight;
-	}
-}
-
-void UIWrapper::drawStatusSection_OSC(float x, float & y, float lineHeight) {
-	y += lineHeight; // Space before separator from previous content
-	y += 30; // Additional fixed space, adjust as needed
-
-	ofSetColor(100);
-	ofDrawLine(x, y - lineHeight, x + 100, y - lineHeight);
-
-	ofSetColor(220, 220, 220);
-	y += lineHeight; // Position for OSC text
-	ofDrawBitmapString("OSC:", x, y);
+	rx -= 22;
 	float timeSinceLastOSC = ofGetElapsedTimef() - lastOSCMessageTime;
 	if (timeSinceLastOSC < OSC_ACTIVITY_FADE_TIME) {
 		float alpha = ofMap(timeSinceLastOSC, 0, OSC_ACTIVITY_FADE_TIME, 255, 0);
-		ofSetColor(0, 255, 0, alpha);
+		ofSetColor(kOk, alpha);
 	} else {
-		ofSetColor(100);
+		ofSetColor(kMuted, 90);
 	}
-	ofDrawCircle(x + 100, y - lineHeight * 0.3f + 2, 4); // Adjusted position and size
+	ofDrawCircle(rx, y + h * 0.5f, 4);
+
+	rx -= 14 + (statusFont.isLoaded() ? statusFont.stringWidth("OSC") : 24.0f);
+	ofSetColor(kMuted);
+	drawChromeText(statusFont, "OSC", rx, textY);
 }
 
-void UIWrapper::drawStatus() {
-	int panelWidth = 225;
-	int panelSpacing = 15;
-	int startX = 15;
-	int statusY = 420;
-	int statusWidth = (panelWidth * 5) + (panelSpacing * 4);
-	int leftSectionWidth = statusWidth * 0.65;
-	int textX = startX + 15;
-	int rightTextX = startX + leftSectionWidth + 20;
-	int initialStatusContentY = statusY + 25;
-	int lineHeight = 18;
+void UIWrapper::drawEStop() {
+	bool hover = eStopRect.inside(ofGetMouseX(), ofGetMouseY());
+	float flash = ofClamp(1.0f - (ofGetElapsedTimef() - lastEStopTime) / 0.35f, 0.0f, 1.0f);
 
-	// Approximate content lines for height calculation (can be refined)
-	int leftContentLines = 12;
-	int rightContentLines = 11;
-	int maxContentLines = std::max(leftContentLines, rightContentLines);
-	int statusHeight = 15 + (maxContentLines * lineHeight) + 80;
+	ofColor fill = hover ? ofColor(154, 34, 38) : ofColor(127, 29, 32);
+	fill.lerp(kDanger, flash * 0.8f);
+	ofSetColor(fill);
+	ofDrawRectRounded(eStopRect, 8);
+	ofNoFill();
+	ofSetLineWidth(2);
+	ofSetColor(kDanger);
+	ofDrawRectRounded(eStopRect, 8);
+	ofFill();
+	ofSetLineWidth(1);
 
-	ofSetColor(40, 40, 45, 180);
-	ofDrawRectRounded(startX, statusY, statusWidth - startX, statusHeight, 6);
-	ofSetColor(60, 60, 60);
-	ofDrawLine(startX + leftSectionWidth + 10, statusY + 10, startX + leftSectionWidth + 10, statusY + statusHeight - 10);
+	ofSetColor(255, 217, 218);
+	const std::string line1 = "STOP ALL";
+	const std::string line2 = "MOTORS";
+	float cx = eStopRect.getCenter().x;
+	if (estopFont.isLoaded()) {
+		estopFont.drawString(line1, cx - estopFont.stringWidth(line1) * 0.5f, eStopRect.y + 28);
+		estopFont.drawString(line2, cx - estopFont.stringWidth(line2) * 0.5f, eStopRect.y + 48);
+	} else {
+		ofDrawBitmapString(line1, cx - line1.size() * 4.0f, eStopRect.y + 28);
+		ofDrawBitmapString(line2, cx - line2.size() * 4.0f, eStopRect.y + 48);
+	}
+}
 
-	// Prepare data for helpers
-	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
+void UIWrapper::drawShortcutsOverlay() {
+	ofSetColor(0, 0, 0, 170);
+	ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
 
-	float currentLeftY = initialStatusContentY;
-	float currentRightY = initialStatusContentY;
+	const float w = 480, h = 320;
+	const float x = (ofGetWidth() - w) * 0.5f;
+	const float y = (ofGetHeight() - h) * 0.5f;
 
-	// === LEFT SECTION ===
-	drawStatusSection_HourglassInfo(hg, textX, currentLeftY, lineHeight, leftSectionWidth - 30);
-	drawStatusSection_KeyboardShortcuts(textX, currentLeftY, lineHeight, leftSectionWidth - 30);
+	ofSetColor(22, 25, 31, 245);
+	ofDrawRectRounded(x, y, w, h, 10);
+	ofNoFill();
+	ofSetColor(kBorder);
+	ofDrawRectRounded(x, y, w, h, 10);
+	ofFill();
 
-	// === RIGHT SECTION ===
-	drawStatusSection_OSC(rightTextX, currentRightY, lineHeight);
+	ofSetColor(kAmber);
+	drawChromeText(statusFont, "KEYBOARD SHORTCUTS", x + 24, y + 34);
+
+	// Keep this list in sync with handleKeyPressed()
+	static const char * const rows[][2] = {
+		{ "1-9", "Select hourglass" },
+		{ "C / X", "Connect / disconnect all" },
+		{ "U / D", "Motor +/- 1000 steps" },
+		{ "LEFT / RIGHT", "Rotate -/+ 45°" },
+		{ "UP / DOWN", "Rotate +/- 180°" },
+		{ "O", "LEDs off (current module)" },
+		{ "V", "Toggle minimal view" },
+		{ "CMD+S", "Save settings" },
+		{ "?", "Close this help" },
+	};
+	float rowY = y + 66;
+	for (auto & row : rows) {
+		ofSetColor(kInk);
+		drawChromeText(statusFont, row[0], x + 24, rowY);
+		ofSetColor(kMuted);
+		drawChromeText(statusFont, row[1], x + 150, rowY);
+		rowY += 26;
+	}
+}
+
+void UIWrapper::selectHourglass(int index) {
+	if (index < 0 || index >= hourglassManager->getHourGlassCount()) return;
+	hourglassSelectorParam = index + 1; // listener rebinds the panels
+}
+
+void UIWrapper::stopAllMotors() {
+	lastEStopTime = ofGetElapsedTimef();
+	for (int i = 0; i < hourglassManager->getHourGlassCount(); i++) {
+		auto * hg = hourglassManager->getHourGlass(i);
+		if (hg && hg->isConnected()) {
+			hg->emergencyStop();
+			hg->motorEnabled.set(false);
+		}
+	}
+	ofLogNotice("UIWrapper") << "STOP ALL MOTORS pressed";
+}
+
+bool UIWrapper::handleMousePressed(int x, int y) {
+	if (shortcutsVisible) {
+		shortcutsVisible = false;
+		return true;
+	}
+	if (currentViewMode == DETAILED_VIEW && eStopRect.inside(x, y)) {
+		stopAllMotors();
+		return true;
+	}
+	return false;
 }
 
 // Keyboard handling
@@ -466,6 +609,9 @@ void UIWrapper::handleViewToggle(int key) {
 	if (key == 'v') { // 'v' for view toggle
 		currentViewMode = (currentViewMode == DETAILED_VIEW) ? MINIMAL_VIEW : DETAILED_VIEW;
 	}
+	if (key == '?' || key == 'h') { // shortcuts overlay
+		shortcutsVisible = !shortcutsVisible;
+	}
 }
 
 // GUI Event Handlers
@@ -491,6 +637,14 @@ void UIWrapper::updateUIPanelsBinding() {
 	// Prevent listeners from acting during this batch rebind from HG state
 	isInternallySyncing = true;
 
+	// Echo the selection in every per-module panel header
+	const std::string tag = " · HG " + ofToString(currentHourGlass + 1);
+	motorPanel.setName("MOTOR" + tag);
+	ledUpPanel.setName("UP LED" + tag);
+	ledDownPanel.setName("DOWN LED" + tag);
+	luminosityPanel.setName("MODULE" + tag);
+	effectsPanel.setName("EFFECTS" + tag);
+
 	// Sync the individual luminosity UI parameter from the HourGlass
 	currentHgIndividualLuminosityParam.set(hg->individualLuminosity.get());
 
@@ -500,7 +654,11 @@ void UIWrapper::updateUIPanelsBinding() {
 	motorPanel.clear(); // Also clear motor panel to re-add its specific elements like buttons
 
 	// === UP LED PANEL === (panels bind the HourGlass's own parameters)
+	// The picker child captures the default fill at creation - keep its canvas
+	// dark, not amber
+	ofxBaseGui::setDefaultFillColor(ofColor(20, 23, 28, 235));
 	ledUpPanel.add(hg->upLedColor.set("RGB Color", hg->upLedColor.get()));
+	ofxBaseGui::setDefaultFillColor(kFillAmber);
 	ledUpPanel.add(hg->upMainLed.set("Main LED", hg->upMainLed.get(), 0, 255));
 	ledUpPanel.add(hg->upPwm.set("PWM", hg->upPwm.get(), 0, 255));
 	ledUpPanel.add(hg->upLedBlend.set("Up Blend", hg->upLedBlend.get(), 0, 768));
@@ -509,7 +667,9 @@ void UIWrapper::updateUIPanelsBinding() {
 	ledUpPanel.getGroup("RGB Color").maximize();
 
 	// === DOWN LED PANEL ===
+	ofxBaseGui::setDefaultFillColor(ofColor(20, 23, 28, 235));
 	ledDownPanel.add(hg->downLedColor.set("RGB Color", hg->downLedColor.get()));
+	ofxBaseGui::setDefaultFillColor(kFillAmber);
 	ledDownPanel.add(hg->downMainLed.set("Main LED", hg->downMainLed.get(), 0, 255));
 	ledDownPanel.add(hg->downPwm.set("PWM", hg->downPwm.get(), 0, 255));
 	ledDownPanel.add(hg->downLedBlend.set("Down Blend", hg->downLedBlend.get(), 0, 768));
@@ -949,7 +1109,26 @@ void UIWrapper::loadHourGlassFromXml(const ofXml & hgNode, HourGlass * hg, int h
 }
 
 // XML save/load for persistence
+// Guarded wrappers: ofXml load/save resolve paths through std::filesystem,
+// which throws when macOS denies folder access (TCC). That must never take
+// the app down - especially not saveSettings() running in the destructor.
 void UIWrapper::saveSettings() {
+	try {
+		saveSettingsImpl();
+	} catch (const std::exception & e) {
+		ofLogError("UIWrapper") << "saveSettings failed: " << e.what();
+	}
+}
+
+void UIWrapper::loadSettings() {
+	try {
+		loadSettingsImpl();
+	} catch (const std::exception & e) {
+		ofLogError("UIWrapper") << "loadSettings failed: " << e.what();
+	}
+}
+
+void UIWrapper::saveSettingsImpl() {
 
 	// === Save UI State (current selection, global settings) ===
 	ofXml uiStateConfig;
@@ -986,7 +1165,7 @@ void UIWrapper::saveSettings() {
 	effectsPanel.saveToFile("effects.xml");
 }
 
-void UIWrapper::loadSettings() {
+void UIWrapper::loadSettingsImpl() {
 
 	// === Load UI State (selection, global settings) ===
 	ofXml uiStateConfig;
@@ -1134,7 +1313,10 @@ void UIWrapper::onSetZeroAllPressed() {
 // --- Vezér sequencer GUI ---
 
 void UIWrapper::setupSequencerPanel() {
-	setupStyledPanel(sequencerPanel, "SEQUENCER (VEZER)", "sequencer.xml", 980, 240);
+	// Wider than the top panels: scene names need the room. Keep the wide
+	// default active until the sequencer widgets below are set up.
+	ofxBaseGui::setDefaultWidth(kSequencerWidth);
+	setupStyledPanel(sequencerPanel, "SEQUENCER (VEZER)", "sequencer.xml", ofGetWidth() - kMargin - kSequencerWidth, kContentTop);
 
 	seqCompParam.set("Scene", 1, 1, 1);
 	seqPlayParam.set("Play", false);
@@ -1155,6 +1337,8 @@ void UIWrapper::setupSequencerPanel() {
 	seqPositionParam.addListener(this, &UIWrapper::onSeqPositionChanged);
 
 	rebuildSequencerPanel();
+
+	ofxBaseGui::setDefaultWidth(kPanelWidth); // back to the top-panel width
 }
 
 void UIWrapper::rebuildSequencerPanel() {

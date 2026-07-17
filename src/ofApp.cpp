@@ -2,9 +2,8 @@
 
 //--------------------------------------------------------------
 void ofApp::setup() {
-	ofSetWindowTitle("Myriades Control System v1.0");
+	ofSetWindowTitle("Myriades");
 	ofSetFrameRate(30);
-	ofSetWindowShape(1200, 800);
 
 	// Basic setup for smooth rendering
 	ofEnableAntiAliasing();
@@ -43,7 +42,7 @@ void ofApp::update() {
 
 //--------------------------------------------------------------
 void ofApp::draw() {
-	ofBackgroundGradient(ofColor(30, 30, 35), ofColor(15, 15, 20));
+	ofBackgroundGradient(ofColor(18, 20, 24), ofColor(10, 11, 14));
 
 	// Draw UI (panels and status)
 	ui.draw();
@@ -59,10 +58,10 @@ void ofApp::keyPressed(int key) {
 void ofApp::keyReleased(int key) { }
 void ofApp::mouseMoved(int x, int y) { }
 void ofApp::mouseDragged(int x, int y, int button) { }
-void ofApp::mousePressed(int x, int y, int button) { }
+void ofApp::mousePressed(int x, int y, int button) { ui.handleMousePressed(x, y); }
 void ofApp::mouseReleased(int x, int y, int button) { }
 void ofApp::mouseEntered(int x, int y) { }
 void ofApp::mouseExited(int x, int y) { }
-void ofApp::windowResized(int w, int h) { }
+void ofApp::windowResized(int w, int h) { ui.windowResized(w, h); }
 void ofApp::gotMessage(ofMessage msg) { }
 void ofApp::dragEvent(ofDragInfo dragInfo) { }

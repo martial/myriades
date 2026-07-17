@@ -7,17 +7,14 @@ int main() {
 	ofGLWindowSettings settings;
 	settings.setGLVersion(4, 0);
 
-	// Set window size
-	settings.setSize(1200, 800);
+	// Six 225px panels + the stop button across the top (screen is 1800pt wide)
+	settings.setSize(1740, 850);
 
-// Enable HiDPI support for Retina displays
 #ifdef TARGET_OSX
-	settings.windowMode = OF_WINDOW; // Windowed mode
-	// Note: HiDPI support may be automatic in your OF version
+	settings.windowMode = OF_WINDOW;
 #endif
 
-	// Set window title
-	settings.title = "🔧 HourGlass Control System v1.0";
+	settings.title = "Myriades";
 
 	auto window = ofCreateWindow(settings);
 

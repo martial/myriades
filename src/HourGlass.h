@@ -64,13 +64,13 @@ public:
 	int getDownLedId() const { return downLedId; }
 	int getMotorId() const { return motorId; }
 
-	// Motor parameters
-	ofParameter<bool> motorEnabled { "motorEnabled", false };
-	ofParameter<int> microstep { "microstep", 16, 1, 256 };
-	ofParameter<int> motorSpeed { "motorSpeed", 100, 0, 500 };
-	ofParameter<int> motorAcceleration { "motorAcceleration", 128, 0, 255 };
-	ofParameter<float> gearRatio { "gearRatio", 15.0f, 0.01f, 1000.0f };
-	ofParameter<float> calibrationFactor { "calibrationFactor", 1.0f, 0.01f, 1000.0f };
+	// Motor parameters (display names — XML persistence uses its own attribute names)
+	ofParameter<bool> motorEnabled { "Enabled", false };
+	ofParameter<int> microstep { "Microstep", 16, 1, 256 };
+	ofParameter<int> motorSpeed { "Speed (steps/s)", 100, 0, 500 };
+	ofParameter<int> motorAcceleration { "Acceleration", 128, 0, 255 };
+	ofParameter<float> gearRatio { "Gear Ratio", 15.0f, 0.01f, 1000.0f };
+	ofParameter<float> calibrationFactor { "Calibration", 1.0f, 0.01f, 1000.0f };
 
 	// LED parameters
 	ofParameter<ofColor> upLedColor { "upLedColor", ofColor::black };

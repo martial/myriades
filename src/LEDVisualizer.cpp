@@ -47,13 +47,42 @@ void LEDVisualizer::draw(float x, float y) {
 	ofPushMatrix();
 	ofTranslate(x, y);
 
-	// Draw compact background
-	ofSetColor(30, 30, 35, 180);
-	ofDrawRectangle(0, 0, vizWidth, vizHeight);
+	// Panel-style frame
+	ofSetColor(16, 18, 22, 215);
+	ofDrawRectRounded(0, 0, vizWidth, vizHeight, 6);
+	ofNoFill();
+	ofSetColor(42, 47, 55, 200);
+	ofDrawRectRounded(0, 0, vizWidth, vizHeight, 6);
+	ofFill();
+
+	auto drawLabel = [this](const std::string & text, float cx, float ly, const ofColor & color) {
+		ofSetColor(color);
+		if (labelFont && labelFont->isLoaded()) {
+			labelFont->drawString(text, cx - labelFont->stringWidth(text) * 0.5f, ly);
+		} else {
+			ofDrawBitmapString(text, cx - text.size() * 4.0f, ly);
+		}
+	};
+
+	// Title
+	ofSetColor(226, 161, 60);
+	std::string title = "LIVE PREVIEW · HG " + ofToString(currentHG + 1);
+	if (labelFont && labelFont->isLoaded()) {
+		labelFont->drawString(title, 16, 24);
+	} else {
+		ofDrawBitmapString(title, 16, 24);
+	}
 
 	// Get LED parameters
 	float globalLum = LedMagnetController::getGlobalLuminosity();
 	float individualLum = hg->individualLuminosity.get();
+
+	// Ring size scales with the panel; leave headroom for the title and the
+	// two label lines below each ring
+	float baseRadius = std::min(vizWidth * 0.13f, vizHeight * 0.34f);
+	float ringY = vizHeight * 0.46f;
+	float upX = vizWidth * 0.30f;
+	float downX = vizWidth * 0.70f;
 
 	// Draw UP controller (left)
 	ofColor upColor = hg->upLedColor.get();
@@ -66,7 +95,7 @@ void LEDVisualizer::draw(float x, float y) {
 		upOrigin = upMagnet->getLastSentOrigin();
 		upArc = upMagnet->getLastSentArc();
 	}
-	drawTinyController(50, 60, upColor, upBlend, upOrigin, upArc, globalLum, individualLum);
+	drawTinyController(upX, ringY, baseRadius, upColor, upBlend, upOrigin, upArc, globalLum, individualLum);
 
 	// Draw DOWN controller (right)
 	ofColor downColor = hg->downLedColor.get();
@@ -78,7 +107,19 @@ void LEDVisualizer::draw(float x, float y) {
 		downOrigin = downMagnet->getLastSentOrigin();
 		downArc = downMagnet->getLastSentArc();
 	}
-	drawTinyController(150, 60, downColor, downBlend, downOrigin, downArc, globalLum, individualLum);
+	drawTinyController(downX, ringY, baseRadius, downColor, downBlend, downOrigin, downArc, globalLum, individualLum);
+
+	if (showLabels) {
+		float labelY = ringY + baseRadius + 26;
+		drawLabel("UP", upX, labelY, ofColor(233, 230, 222));
+		drawLabel("DOWN", downX, labelY, ofColor(233, 230, 222));
+		drawLabel(ofToString((int)upColor.r) + " · " + ofToString((int)upColor.g) + " · " + ofToString((int)upColor.b)
+				+ "  |  arc " + ofToString(upArc) + "° @ " + ofToString(upOrigin) + "°",
+			upX, labelY + 18, ofColor(144, 150, 160));
+		drawLabel(ofToString((int)downColor.r) + " · " + ofToString((int)downColor.g) + " · " + ofToString((int)downColor.b)
+				+ "  |  arc " + ofToString(downArc) + "° @ " + ofToString(downOrigin) + "°",
+			downX, labelY + 18, ofColor(144, 150, 160));
+	}
 
 	ofPopMatrix();
 }
@@ -186,12 +227,13 @@ void LEDVisualizer::calculateLayout() {
 	}
 }
 
-void LEDVisualizer::drawTinyController(float x, float y, const ofColor & rgbColor,
+void LEDVisualizer::drawTinyController(float x, float y, float baseRadius, const ofColor & rgbColor,
 	int blend, int originDegrees, int arcEndDegrees,
 	float globalLum, float individualLum) {
 
-	// Bigger circle radii for better visibility
-	const float radii[] = { 12, 18, 24 }; // Inner, Middle, Outer
+	// Three concentric rings scaled from the outer radius
+	const float radii[] = { baseRadius * 0.5f, baseRadius * 0.75f, baseRadius }; // Inner, Middle, Outer
+	const float ledDotRadius = std::max(2.0f, baseRadius * 0.045f);
 	const int numLedsPerCircle[] = { LedGeometry::NUM_LEDS_CIRCLE_1, LedGeometry::NUM_LEDS_CIRCLE_2, LedGeometry::NUM_LEDS_CIRCLE_3 };
 
 	float finalBrightness = globalLum * individualLum;
@@ -221,12 +263,12 @@ void LEDVisualizer::drawTinyController(float x, float y, const ofColor & rgbColo
 				float ledY = y + sin(angleRad) * radius;
 
 				ofSetColor(rgbColor.r, rgbColor.g, rgbColor.b, finalAlpha * 255);
-				ofDrawCircle(ledX, ledY, 2); // LED dot
+				ofDrawCircle(ledX, ledY, ledDotRadius); // LED dot
 			}
 		}
 	}
 
 	// Draw center point
 	ofSetColor(100, 100, 100);
-	ofDrawCircle(x, y, 2); // Bigger center point
+	ofDrawCircle(x, y, std::max(2.0f, baseRadius * 0.03f));
 }
