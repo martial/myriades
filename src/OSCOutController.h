@@ -2,9 +2,15 @@
 
 #include "ofMain.h"
 #include "ofxOsc.h"
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <deque>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 // OSC Destination configuration
@@ -61,16 +67,37 @@ public:
 	int getSentMessageCount() const { return sentMessageCount; }
 	void resetStats() { sentMessageCount = 0; }
 
+	// Motor commands are one-shot and critical: repeat each message over UDP
+	// to survive packet loss (receivers must treat repeats as retransmissions)
+	static constexpr int MOTOR_SEND_REPEATS = 3;
+	static constexpr int MOTOR_REPEAT_DELAY_MS = 10;
+
 private:
 	bool enabled;
 	std::vector<OSCDestination> destinations;
 	std::map<std::string, std::unique_ptr<ofxOscSender>> senders;
-	int sentMessageCount;
+	std::atomic<int> sentMessageCount;
 
 	// Internal helpers
 	void ensureSenderExists(const OSCDestination & dest);
 	void sendMessageToAll(const ofxOscMessage & message);
 	void sendMessageToDestination(const ofxOscMessage & message, const OSCDestination & dest);
+
+	// Repeated sends: first goes out immediately on the caller thread, the
+	// remaining ones are timed precisely by a small worker thread so the
+	// frame loop never blocks on the inter-send delay.
+	struct PendingRepeat {
+		ofxOscMessage message;
+		int remaining = 0;
+		std::chrono::steady_clock::time_point nextDue;
+	};
+	std::thread repeatThread;
+	std::mutex repeatMutex;
+	std::condition_variable repeatCv;
+	std::deque<PendingRepeat> repeatQueue;
+	bool repeatThreadRunning = false; // guarded by repeatMutex
+	void sendMessageToAllRepeated(const ofxOscMessage & message, int totalSends);
+	void repeatWorker();
 
 	// Message creation helpers
 	std::string buildMotorAddress(const std::string & command, int deviceId = -1);

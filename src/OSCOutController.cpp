@@ -4,10 +4,69 @@
 OSCOutController::OSCOutController()
 	: enabled(true)
 	, sentMessageCount(0) {
+	repeatThreadRunning = true;
+	repeatThread = std::thread(&OSCOutController::repeatWorker, this);
 }
 
 OSCOutController::~OSCOutController() {
+	{
+		std::lock_guard<std::mutex> lock(repeatMutex);
+		repeatThreadRunning = false;
+	}
+	repeatCv.notify_all();
+	if (repeatThread.joinable()) {
+		repeatThread.join();
+	}
 	senders.clear();
+}
+
+void OSCOutController::sendMessageToAllRepeated(const ofxOscMessage & message, int totalSends) {
+	sendMessageToAll(message); // first send goes out immediately
+	if (totalSends <= 1) return;
+
+	{
+		std::lock_guard<std::mutex> lock(repeatMutex);
+		PendingRepeat pending;
+		pending.message = message;
+		pending.remaining = totalSends - 1;
+		pending.nextDue = std::chrono::steady_clock::now() + std::chrono::milliseconds(MOTOR_REPEAT_DELAY_MS);
+		repeatQueue.push_back(std::move(pending));
+	}
+	repeatCv.notify_all();
+}
+
+void OSCOutController::repeatWorker() {
+	std::unique_lock<std::mutex> lock(repeatMutex);
+	while (repeatThreadRunning) {
+		if (repeatQueue.empty()) {
+			repeatCv.wait(lock, [this] { return !repeatThreadRunning || !repeatQueue.empty(); });
+			continue;
+		}
+
+		auto earliest = repeatQueue.front().nextDue;
+		for (const auto & pending : repeatQueue) {
+			earliest = std::min(earliest, pending.nextDue);
+		}
+		auto now = std::chrono::steady_clock::now();
+		if (earliest > now) {
+			repeatCv.wait_until(lock, earliest);
+			continue; // re-evaluate: new entries or shutdown may have arrived
+		}
+
+		for (auto it = repeatQueue.begin(); it != repeatQueue.end();) {
+			if (it->nextDue <= now) {
+				// destinations/senders are only mutated at configuration time,
+				// so sending from this thread is safe during playback
+				sendMessageToAll(it->message);
+				if (--it->remaining <= 0) {
+					it = repeatQueue.erase(it);
+					continue;
+				}
+				it->nextDue = now + std::chrono::milliseconds(MOTOR_REPEAT_DELAY_MS);
+			}
+			++it;
+		}
+	}
 }
 
 void OSCOutController::setup() {
@@ -123,7 +182,7 @@ void OSCOutController::sendMotorZero(int deviceId) {
 	ofxOscMessage msg;
 	msg.setAddress("/motor/zero");
 
-	sendMessageToAll(msg);
+	sendMessageToAllRepeated(msg, MOTOR_SEND_REPEATS);
 }
 
 void OSCOutController::sendMotorHoming(int deviceId) {
@@ -132,7 +191,7 @@ void OSCOutController::sendMotorHoming(int deviceId) {
 	ofxOscMessage msg;
 	msg.setAddress("/motor/homing");
 
-	sendMessageToAll(msg);
+	sendMessageToAllRepeated(msg, MOTOR_SEND_REPEATS);
 }
 
 void OSCOutController::sendMotorEmergency(int deviceId) {
@@ -141,7 +200,7 @@ void OSCOutController::sendMotorEmergency(int deviceId) {
 	ofxOscMessage msg;
 	msg.setAddress("/motor/emergency");
 
-	sendMessageToAll(msg);
+	sendMessageToAllRepeated(msg, MOTOR_SEND_REPEATS);
 }
 
 void OSCOutController::sendMotorUstep(int deviceId, int ustepValue) {
@@ -154,7 +213,7 @@ void OSCOutController::sendMotorUstep(int deviceId, int ustepValue) {
 	msg.setAddress("/motor/ustep");
 	msg.addInt32Arg(ustepValue);
 
-	sendMessageToAll(msg);
+	sendMessageToAllRepeated(msg, MOTOR_SEND_REPEATS);
 }
 
 void OSCOutController::sendMotorRelative(int deviceId, float speedRotMin, float accDegPerS2, float moveDeg) {
@@ -166,7 +225,7 @@ void OSCOutController::sendMotorRelative(int deviceId, float speedRotMin, float 
 	msg.addFloatArg(accDegPerS2);
 	msg.addFloatArg(moveDeg);
 
-	sendMessageToAll(msg);
+	sendMessageToAllRepeated(msg, MOTOR_SEND_REPEATS);
 }
 
 void OSCOutController::sendMotorRelativeStop(int deviceId, float accDegPerS2) {
@@ -176,7 +235,7 @@ void OSCOutController::sendMotorRelativeStop(int deviceId, float accDegPerS2) {
 	msg.setAddress("/motor/relative/stop");
 	msg.addFloatArg(accDegPerS2);
 
-	sendMessageToAll(msg);
+	sendMessageToAllRepeated(msg, MOTOR_SEND_REPEATS);
 }
 
 void OSCOutController::sendMotorAbsolute(int deviceId, float speedRotMin, float accDegPerS2, float moveDeg) {
@@ -188,7 +247,7 @@ void OSCOutController::sendMotorAbsolute(int deviceId, float speedRotMin, float 
 	msg.addFloatArg(accDegPerS2);
 	msg.addFloatArg(moveDeg);
 
-	sendMessageToAll(msg);
+	sendMessageToAllRepeated(msg, MOTOR_SEND_REPEATS);
 }
 
 void OSCOutController::sendMotorAbsoluteStop(int deviceId, float accDegPerS2) {
@@ -198,7 +257,7 @@ void OSCOutController::sendMotorAbsoluteStop(int deviceId, float accDegPerS2) {
 	msg.setAddress("/motor/absolute/stop");
 	msg.addFloatArg(accDegPerS2);
 
-	sendMessageToAll(msg);
+	sendMessageToAllRepeated(msg, MOTOR_SEND_REPEATS);
 }
 
 // Electromagnet control messages
