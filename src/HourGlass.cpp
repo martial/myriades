@@ -1,12 +1,10 @@
 #include "HourGlass.h"
+#include "LedGeometry.h"
 #include "ofMain.h"
 #include <algorithm> // For std::max
 #include <optional>
 #include <string>
 #include <vector>
-
-// Define the static const member for LED command interval (e.g., 50ms for 20 FPS)
-const float HourGlass::MIN_LED_COMMAND_INTERVAL_MS = 50.0f;
 
 // --- Helper function for text bounding box (user provided, adapted) ---
 static ofRectangle customGetBitmapStringBoundingBox(const std::string & text) {
@@ -41,33 +39,11 @@ HourGlass::HourGlass(const std::string & name)
 	, upLedId(0) // Default initialize IDs
 	, downLedId(0)
 	, motorId(0)
-	, updatingFromOSC(false) // Initialized before 'connected' to match typical declaration order implied by warning
+	, updatingFromOSC(false)
 	, connected(false)
-	, lastLedCommandSendTime(0.0f)
 	, upEffectsManager()
 	, downEffectsManager()
 	, oscOutController(nullptr) {
-
-	// Add parameters to the group
-	params.add(motorEnabled);
-	params.add(microstep);
-	params.add(motorSpeed);
-	params.add(motorAcceleration);
-	params.add(gearRatio);
-	params.add(calibrationFactor);
-	params.add(upLedColor);
-	params.add(downLedColor);
-	params.add(upMainLed);
-	params.add(downMainLed);
-	params.add(upPwm);
-	params.add(downPwm);
-	params.add(individualLuminosity);
-	params.add(upLedBlend);
-	params.add(upLedOrigin);
-	params.add(upLedArc);
-	params.add(downLedBlend);
-	params.add(downLedOrigin);
-	params.add(downLedArc);
 }
 
 HourGlass::~HourGlass() {
@@ -112,7 +88,6 @@ bool HourGlass::connect() {
 bool HourGlass::isConnected() const {
 	// Always return true for OSC testing - serial connection not required
 	return true;
-	// return connected && sharedSerialPort && sharedSerialPort->isInitialized();
 }
 
 void HourGlass::disconnect() {
@@ -199,25 +174,17 @@ void HourGlass::emergencyStop() {
 	}
 }
 
+void HourGlass::refreshLedState() {
+	if (upLedMagnet) upLedMagnet->resetLastSentValues();
+	if (downLedMagnet) downLedMagnet->resetLastSentValues();
+}
+
 void HourGlass::setAllLEDs(uint8_t r, uint8_t g, uint8_t b) {
-	// Only update parameters, let OSCController::processLastCommands or UI direct calls handle sending
-	// Throttling is removed here as direct sending is removed.
-	// The responsibility for throttling and actual hardware send is now with:
-	//  - UIWrapper listeners (for direct UI interaction)
-	//  - OSCController::processLastCommands (for state synchronization from parameters)
-
-	// bool wasUpdatingFromOSC = updatingFromOSC; // This flag is tricky here.
-	// If OSC calls this, updatingFromOSC should be true when params are set.
-	// If UI calls this (e.g. a preset button that uses setAllLEDs), it might be false.
-	// For now, let the caller manage the updatingFromOSC flag if necessary before calling this.
-
-	// It's crucial that if OSC is the origin of this call, 'updatingFromOSC' is true
-	// BEFORE ofParameters are set, so listeners in UIWrapper can ignore these changes if needed.
-	// OSCController::handleLedMessage for "/led/all/rgb" does set hg->updatingFromOSC = true;
-
+	// Only updates parameters; the actual send happens in applyLedParameters()
+	// on the next frame. If OSC is the origin of this call, 'updatingFromOSC'
+	// must be true BEFORE the parameters are set so UI listeners can ignore it.
 	upLedColor.set(ofColor(r, g, b));
 	downLedColor.set(ofColor(r, g, b));
-	// ofLogNotice("HourGlass") << name << " - Parameters set by setAllLEDs: R" << (int)r << " G" << (int)g << " B" << (int)b;
 }
 
 void HourGlass::applyMotorParameters() {
@@ -235,11 +202,6 @@ void HourGlass::applyMotorParameters() {
 		}
 	}
 
-	// Send OSC message for microstep if not updating from OSC
-	if (isOSCOutEnabled() && !updatingFromOSC) {
-		//oscOutController->sendMotorUstep(motorId, microstep.get());
-	}
-
 	// Determine speed and acceleration to use for pending commands
 	// Use pending values if provided, otherwise fallback to ofParameters
 	int currentSpeed = pendingMoveSpeed.value_or(motorSpeed.get());
@@ -247,13 +209,10 @@ void HourGlass::applyMotorParameters() {
 
 	// Execute pending commands
 	if (executeRelativeMove) {
-
-		// Send to motor controller if available
 		if (hasMotorController) {
 			motor->moveRelative(currentSpeed, currentAccel, targetRelativeSteps);
 		}
 
-		// Send OSC message if not updating from OSC (avoid feedback loops)
 		if (isOSCOutEnabled() && !updatingFromOSC) {
 			// Convert steps to degrees for OSC message (simplified conversion)
 			float degrees = static_cast<float>(targetRelativeSteps) / (gearRatio.get() * calibrationFactor.get());
@@ -262,13 +221,10 @@ void HourGlass::applyMotorParameters() {
 		executeRelativeMove = false;
 	}
 	if (executeAbsoluteMove) {
-
-		// Send to motor controller if available
 		if (hasMotorController) {
 			motor->moveAbsolute(currentSpeed, currentAccel, targetAbsolutePosition);
 		}
 
-		// Send OSC message if not updating from OSC (avoid feedback loops)
 		if (isOSCOutEnabled() && !updatingFromOSC) {
 			// Convert steps to degrees for OSC message (simplified conversion)
 			float degrees = static_cast<float>(targetAbsolutePosition) / (gearRatio.get() * calibrationFactor.get());
@@ -277,26 +233,20 @@ void HourGlass::applyMotorParameters() {
 		executeAbsoluteMove = false;
 	}
 	if (executeRelativeAngle) {
-
-		// Send to motor controller if available
 		if (hasMotorController) {
 			motor->moveRelativeAngle(currentSpeed, currentAccel, targetRelativeDegrees, gearRatio.get(), calibrationFactor.get());
 		}
 
-		// Send OSC message if not updating from OSC (avoid feedback loops)
 		if (isOSCOutEnabled() && !updatingFromOSC) {
 			oscOutController->sendMotorRelative(motorId, currentSpeed, currentAccel, targetRelativeDegrees);
 		}
 		executeRelativeAngle = false;
 	}
 	if (executeAbsoluteAngle) {
-
-		// Send to motor controller if available
 		if (hasMotorController) {
 			motor->moveAbsoluteAngle(currentSpeed, currentAccel, targetAbsoluteDegrees, gearRatio.get(), calibrationFactor.get());
 		}
 
-		// Send OSC message if not updating from OSC (avoid feedback loops)
 		if (isOSCOutEnabled() && !updatingFromOSC) {
 			oscOutController->sendMotorAbsolute(motorId, currentSpeed, currentAccel, targetAbsoluteDegrees);
 		}
@@ -309,7 +259,6 @@ void HourGlass::applyMotorParameters() {
 }
 
 void HourGlass::updateEffects(float deltaTime) {
-	// ofLogVerbose("HourGlass::updateEffects") << getName() << " - deltaTime: " << deltaTime; // COMMENTED BACK
 	upEffectsManager.update(deltaTime);
 	downEffectsManager.update(deltaTime);
 }
@@ -334,137 +283,76 @@ void HourGlass::clearDownEffects() {
 	downEffectsManager.clearEffects();
 }
 
-// Modified applyLedParameters
-void HourGlass::applyLedParameters() {
-	// Allow LED parameter processing even without serial connection
-	bool hasLedControllers = (upLedMagnet && downLedMagnet);
+// Shared UP/DOWN pipeline: effects -> controller -> change-tracked OSC out
+void HourGlass::applyLedSide(LedMagnetController * controller, EffectsManager & effectsManager,
+	const char * oscPosition,
+	const ofParameter<ofColor> & colorParam, const ofParameter<int> & mainLedParam,
+	const ofParameter<int> & blendParam, const ofParameter<int> & originParam,
+	const ofParameter<int> & arcParam, const ofParameter<int> & pwmParam,
+	LedSideState & lastSent, float dt) {
 
-	float currentTime = ofGetElapsedTimeMillis();
-	if (currentTime - lastLedCommandSendTime < MIN_LED_COMMAND_INTERVAL_MS) {
-		// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - Throttled"; // Keep this commented
-		//return;
+	EffectParameters params;
+	params.color = colorParam.get();
+	params.mainLedValue = mainLedParam.get();
+	params.blend = blendParam.get();
+	params.origin = originParam.get();
+	params.arc = arcParam.get();
+	params.effectLuminosityMultiplier = 1.0f;
+	params.deltaTime = dt;
+
+	effectsManager.processEffects(params);
+
+	float finalIndividualLuminosity = individualLuminosity.get() * params.effectLuminosityMultiplier;
+
+	// UNIFIED COMMAND: Send all LED parameters in one consistent format
+	if (controller) {
+		controller->sendAllLEDParameters(
+			params.color.r, params.color.g, params.color.b,
+			params.blend, params.origin, params.arc,
+			static_cast<uint8_t>(params.mainLedValue),
+			static_cast<uint8_t>(pwmParam.get()),
+			finalIndividualLuminosity);
 	}
-	// ofLogNotice("HourGlass::applyLedParameters") << getName() << " - Applying LED parameters with effects."; // Keep this one for now, or comment if too noisy
 
+	// Send OSC messages - only what actually changed
+	if (isOSCOutEnabled() && !updatingFromOSC) {
+		bool rgbChanged = (params.color != lastSent.color || params.origin != lastSent.origin || params.arc != lastSent.arc || finalIndividualLuminosity != lastSent.luminosity);
+		bool mainLedChanged = (params.mainLedValue != lastSent.mainLed);
+		bool pwmChanged = (pwmParam.get() != lastSent.pwm);
+
+		if (rgbChanged) {
+			uint8_t masterAlpha = static_cast<uint8_t>(finalIndividualLuminosity * 255.0f);
+			oscOutController->sendRGBLED(oscPosition, params.color.r, params.color.g, params.color.b,
+				masterAlpha, params.origin, params.arc);
+
+			lastSent.color = params.color;
+			lastSent.origin = params.origin;
+			lastSent.arc = params.arc;
+			lastSent.luminosity = finalIndividualLuminosity;
+		}
+
+		if (mainLedChanged) {
+			oscOutController->sendPowerLED(oscPosition, static_cast<uint8_t>(params.mainLedValue));
+			lastSent.mainLed = params.mainLedValue;
+		}
+
+		if (pwmChanged) {
+			oscOutController->sendMagnet(oscPosition, static_cast<uint8_t>(pwmParam.get()));
+			lastSent.pwm = pwmParam.get();
+		}
+	}
+}
+
+void HourGlass::applyLedParameters() {
 	float dt = ofGetLastFrameTime();
 
-	// --- UP LED Controller ---
-	EffectParameters upParams;
-	// ... (population of upParams) ...
-	upParams.color = upLedColor.get();
-	upParams.mainLedValue = upMainLed.get();
-	upParams.blend = upLedBlend.get();
-	upParams.origin = upLedOrigin.get();
-	upParams.arc = upLedArc.get();
-	upParams.effectLuminosityMultiplier = 1.0f;
-	upParams.deltaTime = dt;
+	applyLedSide(upLedMagnet.get(), upEffectsManager, "top",
+		upLedColor, upMainLed, upLedBlend, upLedOrigin, upLedArc, upPwm,
+		lastUpSent, dt);
 
-	// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - UP Before effects - Arc: " << upParams.arc << " LumM: " << upParams.effectLuminosityMultiplier; // COMMENTED BACK
-	upEffectsManager.processEffects(upParams);
-	// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - UP After effects - Arc: " << upParams.arc << " LumM: " << upParams.effectLuminosityMultiplier; // COMMENTED BACK
-
-	float finalUpIndividualLuminosity = individualLuminosity.get() * upParams.effectLuminosityMultiplier;
-
-	// UNIFIED COMMAND: Send all LED parameters in one consistent format
-	if (hasLedControllers) {
-		upLedMagnet->sendAllLEDParameters(
-			upParams.color.r, upParams.color.g, upParams.color.b,
-			upParams.blend, upParams.origin, upParams.arc,
-			static_cast<uint8_t>(upParams.mainLedValue),
-			static_cast<uint8_t>(upPwm.get()),
-			finalUpIndividualLuminosity);
-	}
-
-	// Send OSC messages for UP LED - OPTIMIZED: only send what actually changed
-	if (isOSCOutEnabled() && !updatingFromOSC) {
-		// Check individual parameter changes
-		bool upRgbChanged = (upParams.color != lastUpColor || upParams.origin != lastUpOrigin || upParams.arc != lastUpArc || finalUpIndividualLuminosity != lastUpLuminosity);
-		bool upMainLedChanged = (upParams.mainLedValue != lastUpMainLed);
-		bool upPwmChanged = (upPwm.get() != lastUpPwm);
-
-		// Send only what actually changed
-		if (upRgbChanged) {
-			uint8_t masterAlpha = static_cast<uint8_t>(finalUpIndividualLuminosity * 255.0f);
-			oscOutController->sendRGBLED("top", upParams.color.r, upParams.color.g, upParams.color.b,
-				masterAlpha, upParams.origin, upParams.arc);
-
-			// Update RGB tracking
-			lastUpColor = upParams.color;
-			lastUpOrigin = upParams.origin;
-			lastUpArc = upParams.arc;
-			lastUpLuminosity = finalUpIndividualLuminosity;
-		}
-
-		if (upMainLedChanged) {
-			oscOutController->sendPowerLED("top", static_cast<uint8_t>(upParams.mainLedValue));
-			lastUpMainLed = upParams.mainLedValue;
-		}
-
-		if (upPwmChanged) {
-			oscOutController->sendMagnet("top", static_cast<uint8_t>(upPwm.get()));
-			lastUpPwm = upPwm.get();
-		}
-	}
-
-	// --- DOWN LED Controller ---
-	EffectParameters downParams;
-	// ... (population of downParams) ...
-	downParams.color = downLedColor.get();
-	downParams.mainLedValue = downMainLed.get();
-	downParams.blend = downLedBlend.get();
-	downParams.origin = downLedOrigin.get();
-	downParams.arc = downLedArc.get();
-	downParams.effectLuminosityMultiplier = 1.0f;
-	downParams.deltaTime = dt;
-
-	// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - DOWN Before effects - Arc: " << downParams.arc << " LumM: " << downParams.effectLuminosityMultiplier; // COMMENTED BACK
-	downEffectsManager.processEffects(downParams);
-	// ofLogVerbose("HourGlass::applyLedParameters") << getName() << " - DOWN After effects - Arc: " << downParams.arc << " LumM: " << downParams.effectLuminosityMultiplier; // COMMENTED BACK
-
-	float finalDownIndividualLuminosity = individualLuminosity.get() * downParams.effectLuminosityMultiplier;
-
-	// UNIFIED COMMAND: Send all LED parameters in one consistent format
-	if (hasLedControllers) {
-		downLedMagnet->sendAllLEDParameters(
-			downParams.color.r, downParams.color.g, downParams.color.b,
-			downParams.blend, downParams.origin, downParams.arc,
-			static_cast<uint8_t>(downParams.mainLedValue),
-			static_cast<uint8_t>(downPwm.get()),
-			finalDownIndividualLuminosity);
-	}
-
-	// Send OSC messages for DOWN LED - OPTIMIZED: only send what actually changed
-	if (isOSCOutEnabled() && !updatingFromOSC) {
-		// Check individual parameter changes
-		bool downRgbChanged = (downParams.color != lastDownColor || downParams.origin != lastDownOrigin || downParams.arc != lastDownArc || finalDownIndividualLuminosity != lastDownLuminosity);
-		bool downMainLedChanged = (downParams.mainLedValue != lastDownMainLed);
-		bool downPwmChanged = (downPwm.get() != lastDownPwm);
-
-		// Send only what actually changed
-		if (downRgbChanged) {
-			uint8_t masterAlpha = static_cast<uint8_t>(finalDownIndividualLuminosity * 255.0f);
-			oscOutController->sendRGBLED("bot", downParams.color.r, downParams.color.g, downParams.color.b,
-				masterAlpha, downParams.origin, downParams.arc);
-
-			// Update RGB tracking
-			lastDownColor = downParams.color;
-			lastDownOrigin = downParams.origin;
-			lastDownArc = downParams.arc;
-			lastDownLuminosity = finalDownIndividualLuminosity;
-		}
-
-		if (downMainLedChanged) {
-			oscOutController->sendPowerLED("bot", static_cast<uint8_t>(downParams.mainLedValue));
-			lastDownMainLed = downParams.mainLedValue;
-		}
-
-		if (downPwmChanged) {
-			oscOutController->sendMagnet("bot", static_cast<uint8_t>(downPwm.get()));
-			lastDownPwm = downPwm.get();
-		}
-	}
-
-	lastLedCommandSendTime = currentTime;
+	applyLedSide(downLedMagnet.get(), downEffectsManager, "bot",
+		downLedColor, downMainLed, downLedBlend, downLedOrigin, downLedArc, downPwm,
+		lastDownSent, dt);
 }
 
 void HourGlass::commandRelativeMove(int steps, std::optional<int> speed, std::optional<int> accel) {
@@ -506,48 +394,7 @@ void HourGlass::setMotorZero() {
 	}
 }
 
-// --- Start of new/updated methods for enhanced minimal view ---
-
-// Helper function to normalize angle to 0-360 range
-float HourGlass::normalizeMinimalAngle(float angle) {
-	while (angle < 0)
-		angle += 360.0f;
-	while (angle >= 360.0f)
-		angle -= 360.0f;
-	return angle;
-}
-
-// Helper function to check if an angle is within a specified arc
-bool HourGlass::isMinimalAngleInArc(float currentAngleDegrees, int startAngleDegrees, int arcSpanDegrees) {
-	currentAngleDegrees = normalizeMinimalAngle(currentAngleDegrees);
-	startAngleDegrees = static_cast<int>(normalizeMinimalAngle(static_cast<float>(startAngleDegrees)));
-	arcSpanDegrees = std::max(0, std::min(arcSpanDegrees, 360));
-
-	if (arcSpanDegrees == 360) return true;
-	if (arcSpanDegrees == 0) return false;
-
-	int endAngleDegreesCalculated = static_cast<int>(normalizeMinimalAngle(static_cast<float>(startAngleDegrees + arcSpanDegrees)));
-
-	if (startAngleDegrees <= endAngleDegreesCalculated) {
-		return currentAngleDegrees >= startAngleDegrees && currentAngleDegrees <= endAngleDegreesCalculated;
-	} else {
-		return currentAngleDegrees >= startAngleDegrees || currentAngleDegrees <= endAngleDegreesCalculated;
-	}
-}
-
-// Helper function to determine alpha for each LED circle based on blend value
-float HourGlass::getMinimalCircleAlpha(int circleIndex, int blend) {
-	float normalizedBlend = ofMap(blend, 0, 768, 0.0f, 1.0f, true);
-	if (normalizedBlend <= 0.5f) {
-		if (circleIndex == 0) return 1.0f - (normalizedBlend * 2.0f);
-		if (circleIndex == 1) return normalizedBlend * 2.0f;
-		return 0.0f;
-	} else {
-		if (circleIndex == 0) return 0.0f;
-		if (circleIndex == 1) return 1.0f - ((normalizedBlend - 0.5f) * 2.0f);
-		return (normalizedBlend - 0.5f) * 2.0f;
-	}
-}
+// --- Minimal view drawing ---
 
 // Draws a single LED controller (UP or DOWN) - V8 RIGOROUS BOUNDS
 ofRectangle HourGlass::drawSingleLedControllerMinimal(float x, float y, const std::string & label,
@@ -581,12 +428,11 @@ ofRectangle HourGlass::drawSingleLedControllerMinimal(float x, float y, const st
 
 	ofPushMatrix();
 	ofTranslate(circlesCenterX, circlesCenterY);
-	// ... (Circle drawing logic - largely unchanged from V7, ensure it draws centered at 0,0 here) ...
 	const float radii[] = { MINIMAL_CIRCLE_1_RADIUS, MINIMAL_CIRCLE_2_RADIUS, MINIMAL_CIRCLE_3_RADIUS };
-	const int numLedsPerCircle[] = { NUM_LEDS_CIRCLE_1, NUM_LEDS_CIRCLE_2, NUM_LEDS_CIRCLE_3 };
+	const int numLedsPerCircle[] = { LedGeometry::NUM_LEDS_CIRCLE_1, LedGeometry::NUM_LEDS_CIRCLE_2, LedGeometry::NUM_LEDS_CIRCLE_3 };
 	float finalEffectiveBrightness = globalLum * individualLum;
 	for (int circleIdx = 0; circleIdx < 3; ++circleIdx) {
-		float circleAlpha = getMinimalCircleAlpha(circleIdx, blend);
+		float circleAlpha = LedGeometry::circleAlphaForBlend(circleIdx, blend);
 		if (circleAlpha < 0.01f) continue;
 		float currentRadius = radii[circleIdx];
 		int numLeds = numLedsPerCircle[circleIdx];
@@ -597,7 +443,7 @@ ofRectangle HourGlass::drawSingleLedControllerMinimal(float x, float y, const st
 		ofFill();
 		for (int i = 0; i < numLeds; ++i) {
 			float ledAngleDeg = ofMap(i, 0, numLeds, 0, 360);
-			if (isMinimalAngleInArc(ledAngleDeg, origin, arc)) {
+			if (LedGeometry::isAngleInArc(ledAngleDeg, origin, arc)) {
 				float angleRad = ofDegToRad(ledAngleDeg);
 				float ledX = cos(angleRad) * currentRadius;
 				float ledY = sin(angleRad) * currentRadius;
@@ -747,5 +593,3 @@ void HourGlass::drawMinimal(float x, float y) {
 	ofFill();
 	ofPopMatrix();
 }
-
-// --- End of new/updated methods ---

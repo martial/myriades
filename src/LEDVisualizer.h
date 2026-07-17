@@ -14,7 +14,7 @@ public:
 	void update();
 	void draw(float x = 0, float y = 0);
 
-	// Set UIWrapper reference to access LED effect parameters
+	// Set UIWrapper reference to access the current hourglass selection
 	void setUIWrapper(class UIWrapper * uiWrapper);
 
 	// Configuration
@@ -32,12 +32,6 @@ public:
 	void setLayoutMode(int mode); // 0=grid, 1=horizontal, 2=vertical
 	void setControllerSpacing(float spacing);
 
-	// Real-time visualization of specific controller
-	void drawController(float x, float y, float radius,
-		const ofColor & rgbColor, int blend, int origin, int arc,
-		float globalLum, float individualLum,
-		const std::string & label = "");
-
 	// Compact preview controller
 	void drawTinyController(float x, float y, const ofColor & rgbColor,
 		int blend, int origin, int arc, float globalLum, float individualLum);
@@ -51,18 +45,8 @@ private:
 	int layoutMode;
 	float controllerSpacing;
 
-	// UI parameter access
+	// UI selection access
 	class UIWrapper * uiWrapper;
-
-	// LED Circle System Constants (matching hardware)
-	static const int NUM_LEDS_CIRCLE_1 = 32; // Inner circle
-	static const int NUM_LEDS_CIRCLE_2 = 36; // Middle circle
-	static const int NUM_LEDS_CIRCLE_3 = 42; // Outer circle
-
-	// Visual parameters
-	static constexpr float CIRCLE_1_RADIUS = 40.0f;
-	static constexpr float CIRCLE_2_RADIUS = 65.0f;
-	static constexpr float CIRCLE_3_RADIUS = 90.0f;
 
 	// Tracked hourglasses
 	struct HourGlassVisualization {
@@ -76,25 +60,4 @@ private:
 
 	// Helper methods
 	void calculateLayout();
-	void drawHourGlassControllers(const HourGlassVisualization & hgViz);
-	void drawLEDCircles(float centerX, float centerY,
-		const ofColor & rgbColor, int blend, int origin, int arc,
-		float globalLum, float individualLum);
-
-	void drawSingleCircle(float centerX, float centerY, float radius, int numLeds,
-		const ofColor & baseColor, float alpha,
-		int origin, int arc);
-
-	void drawArcIndicators(float centerX, float centerY, float radius,
-		int origin, int arc, const ofColor & color, float alpha);
-
-	bool isAngleInArc(float currentAngleDegrees, int startAngleDegrees, int endAngleDegrees);
-	float normalizeAngle(float angle);
-	float getCircleAlpha(int circleIndex, int blend);
-
-	// Visual effects
-	void drawGlow(float x, float y, float radius, const ofColor & color, float alpha);
-	void drawLabel(float x, float y, const std::string & text, const ofColor & color = ofColor::white);
-	void drawParameterDisplay(float x, float y, int blend, int origin, int arc,
-		float globalLum, float individualLum);
 };

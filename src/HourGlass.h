@@ -9,7 +9,6 @@
 
 #include "ofMain.h"
 #include "ofParameter.h"
-#include "ofxOsc.h"
 #include <memory>
 #include <optional>
 #include <string>
@@ -49,6 +48,10 @@ public:
 	void setMotorZero();
 	void setAllLEDs(uint8_t r, uint8_t g, uint8_t b);
 
+	// Invalidate LED last-sent caches so next applyLedParameters re-sends
+	// (needed after global/individual luminosity changes)
+	void refreshLedState();
+
 	// Parameter-driven methods for OSC/GUI sync
 	void applyMotorParameters();
 	void applyLedParameters();
@@ -60,9 +63,6 @@ public:
 	int getUpLedId() const { return upLedId; }
 	int getDownLedId() const { return downLedId; }
 	int getMotorId() const { return motorId; }
-
-	// Shared Parameters for OSC/GUI synchronization using ofParameterGroup
-	ofParameterGroup params { "HourGlass" };
 
 	// Motor parameters
 	ofParameter<bool> motorEnabled { "motorEnabled", false };
@@ -81,7 +81,7 @@ public:
 	ofParameter<int> downPwm { "downPwm", 0, 0, 255 };
 	ofParameter<float> individualLuminosity { "individualLuminosity", 1.0f, 0.0f, 1.0f };
 
-	// New ofParameters for LED effects base values
+	// LED effects base values
 	ofParameter<int> upLedBlend { "upLedBlend", 0, 0, 768 };
 	ofParameter<int> upLedOrigin { "upLedOrigin", 0, 0, 360 };
 	ofParameter<int> upLedArc { "upLedArc", 360, 0, 360 }; // Default to full arc
@@ -92,10 +92,6 @@ public:
 
 	// OSC update flag
 	bool updatingFromOSC;
-
-	// For rate-limiting LED commands to hardware
-	float lastLedCommandSendTime;
-	static const float MIN_LED_COMMAND_INTERVAL_MS;
 
 	// Dirty flags for optimization
 	mutable bool ledParametersDirty = true;
@@ -160,26 +156,29 @@ private:
 	// Helper methods
 	void setupControllers();
 
-	// OSC change tracking to prevent spam
-	ofColor lastUpColor, lastDownColor;
-	int lastUpOrigin = -1, lastUpArc = -1, lastUpPwm = -1, lastUpMainLed = -1;
-	int lastDownOrigin = -1, lastDownArc = -1, lastDownPwm = -1, lastDownMainLed = -1;
-	float lastUpLuminosity = -1.0f, lastDownLuminosity = -1.0f;
+	// Last values mirrored to OSC-out, to prevent spam (one struct per side)
+	struct LedSideState {
+		ofColor color;
+		int origin = -1, arc = -1, pwm = -1, mainLed = -1;
+		float luminosity = -1.0f;
+	};
+	LedSideState lastUpSent, lastDownSent;
+
+	// Shared UP/DOWN pipeline: effects -> controller -> change-tracked OSC out
+	void applyLedSide(LedMagnetController * controller, EffectsManager & effectsManager,
+		const char * oscPosition,
+		const ofParameter<ofColor> & colorParam, const ofParameter<int> & mainLedParam,
+		const ofParameter<int> & blendParam, const ofParameter<int> & originParam,
+		const ofParameter<int> & arcParam, const ofParameter<int> & pwmParam,
+		LedSideState & lastSent, float dt);
 
 	// Helper for minimal view
 	ofRectangle drawSingleLedControllerMinimal(float x, float y, const std::string & label,
 		const ofColor & color, int blend, int origin, int arc,
 		float globalLum, float individualLum, bool isUpController);
 
-	// Constants for drawing, adapted from LEDVisualizer
-	static const int NUM_LEDS_CIRCLE_1 = 32;
-	static const int NUM_LEDS_CIRCLE_2 = 36;
-	static const int NUM_LEDS_CIRCLE_3 = 42;
+	// Radii for minimal view drawing
 	static constexpr float MINIMAL_CIRCLE_1_RADIUS = 30.0f;
 	static constexpr float MINIMAL_CIRCLE_2_RADIUS = 45.0f;
 	static constexpr float MINIMAL_CIRCLE_3_RADIUS = 60.0f;
-
-	float getMinimalCircleAlpha(int circleIndex, int blend);
-	bool isMinimalAngleInArc(float currentAngleDegrees, int startAngleDegrees, int arcSpanDegrees);
-	float normalizeMinimalAngle(float angle);
 };

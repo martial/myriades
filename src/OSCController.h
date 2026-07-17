@@ -5,6 +5,7 @@
 #include "ofMain.h"
 #include "ofxOsc.h"
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,25 +31,22 @@ public:
 
 	// OSC message handling
 	void processMessage(ofxOscMessage & message);
-	void forceRefreshAllHardwareStates();
 
-	// Motor Presets (private)
+	// Motor Presets
 	std::map<std::string, std::pair<int, int>> motorPresets;
 	void loadMotorPresets(const std::string & filename = "motor_presets.json");
 
-	// Utility functions for hourglass targeting
-	std::vector<std::string> splitAddress(const std::string & address);
+	// Utility functions for hourglass targeting (1-based OSC ids)
 	int extractHourglassId(const std::vector<std::string> & addressParts);
-	std::vector<int> extractHourglassIds(const std::vector<std::string> & addressParts); // New: supports "all" and "1-3" syntax
+	std::vector<int> extractHourglassIds(const std::vector<std::string> & addressParts); // supports "all", "1,3" and "1-3" syntax
 	HourGlass * getHourglassById(int id);
-	std::vector<HourGlass *> getHourglassesByIds(const std::vector<int> & ids); // New: get multiple hourglasses
 	bool isValidHourglassId(int id);
 
 	// Helper functions for multi-hourglass LED operations
-	void handleIndividualLedMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, int hourglassId, const std::string & target, const std::string & command, const std::vector<std::string> & addressParts);
-	void handleAllLedMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, int hourglassId, const std::string & command, const std::vector<std::string> & addressParts);
-	void handlePWMMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, int hourglassId, const std::vector<std::string> & addressParts);
-	void handleMainLedMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, int hourglassId, const std::vector<std::string> & addressParts);
+	void handleIndividualLedMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, const std::string & target, const std::string & command);
+	void handleAllLedMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, const std::string & command, const std::vector<std::string> & addressParts);
+	void handlePWMMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts);
+	void handleMainLedMessageForHourglass(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts);
 
 private:
 	// OSC communication
@@ -64,37 +62,30 @@ private:
 	// Connection settings
 	int receivePort;
 
-	// Process last commands in main thread
-	void processLastCommands();
-
 	// Message handlers
-	void handleConnectionMessage(ofxOscMessage & msg);
-	void handleMotorMessage(ofxOscMessage & msg);
-	void handleLedMessage(ofxOscMessage & msg);
-	void handleSystemMessage(ofxOscMessage & msg);
+	void handleMotorMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
+	void handleLedMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
+	void handleSystemMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
 	void handleGlobalBlackoutMessage(ofxOscMessage & msg);
 	void handleGlobalLuminosityMessage(ofxOscMessage & msg);
-	void handleIndividualLuminosityMessage(ofxOscMessage & msg);
-	void handleMotorPresetMessage(ofxOscMessage & msg);
+	void handleIndividualLuminosityMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
 	void handleSystemMotorPresetMessage(ofxOscMessage & msg);
 	void handleSystemMotorConfigMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
-	void handleIndividualMotorConfigMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
 	void handleSystemMotorRotateMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
 	void handleSystemMotorPositionMessage(ofxOscMessage & msg, const std::vector<std::string> & addressParts);
-	void handleSystemSetZeroAllMessage(ofxOscMessage & msg); // New handler for setting zero on all motors
 
-	// New feature handlers (ensure this block and its contents are preserved)
-	void handlePWMMessage(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts);
-	void handleMainLedMessage(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts);
-	void handleMotorRelativeMessage(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts);
-	void handleMotorAbsoluteMessage(ofxOscMessage & msg, HourGlass * hg, const std::vector<std::string> & addressParts);
+	// Shared helpers
+	bool lookupPreset(const std::string & presetName, const std::string & address, int & speed, int & accel);
+	static void applyMotorSpeedAccel(HourGlass & hg, int speed, int accel);
+	bool parseAngleSpeedAccel(ofxOscMessage & msg, const std::vector<std::string> & addressParts, size_t angleIdx,
+		const std::string & context, float & degrees, std::optional<int> & speed, std::optional<int> & accel);
+	void setLedRangeParam(ofxOscMessage & msg, const std::string & context, int minValue, int maxValue, int defaultValue,
+		ofParameter<int> * upParam, ofParameter<int> * downParam);
+	void applyIndividualLuminosity(const std::vector<std::string> & addressParts, const std::string & address, float value);
 
 	// UI parameter synchronization helpers
 	void updateUIAngleParameters(float relativeAngle, float absoluteAngle);
 
 	// Utility functions
 	void sendError(const std::string & originalAddress, const std::string & errorMessage);
-
-	// Logging helpers
-	void logOSCMessage(const ofxOscMessage & msg, const std::string & action = "received");
 };

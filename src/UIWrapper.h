@@ -5,7 +5,6 @@
 #include "LEDVisualizer.h"
 #include "ofMain.h"
 #include "ofxGui.h"
-#include "ofxOscParameterSync.h"
 #include <functional>
 
 class OSCController; // Forward declaration for the pointer
@@ -56,30 +55,12 @@ public:
 	void drawStatusSection_KeyboardShortcuts(float x, float & y, float lineHeight, float sectionWidth);
 	void drawStatusSection_OSC(float x, float & y, float lineHeight);
 
-	// Methods for OSCController to update UI parameters safely
-	// These will also need to use the isInternallySyncing flag or ensure
-	// their programmatic .set() calls on UIWrapper params don't cause undesired listener firing.
-	void updateUpLedBlendFromOSC(int value);
-	void updateUpLedOriginFromOSC(int value);
-	void updateUpLedArcFromOSC(int value);
-	void updateDownLedBlendFromOSC(int value);
-	void updateDownLedOriginFromOSC(int value);
-	void updateDownLedArcFromOSC(int value);
-
 	// Global Luminosity Panel and Parameters (public for access if needed, though typically managed internally)
 	ofxPanel globalSettingsPanel; // Panel to hold global settings like luminosity
 	ofParameter<float> globalLuminosityParam; // UI Parameter for global luminosity
 	ofxFloatSlider globalLuminositySlider; // UI Slider for global luminosity
 	ofParameter<float> currentHgIndividualLuminosityParam { "Indiv. Luminosity", 1.0f, 0.0f, 1.0f };
 	ofxFloatSlider currentHgIndividualLuminositySlider;
-
-	// LED effect parameters - now public and named
-	ofParameter<int> upLedBlendParam { "Up Blend", 0, 0, 768 };
-	ofParameter<int> upLedOriginParam { "Up Origin", 0, 0, 360 };
-	ofParameter<int> upLedArcParam { "Up Arc", 360, 0, 360 };
-	ofParameter<int> downLedBlendParam { "Down Blend", 0, 0, 768 };
-	ofParameter<int> downLedOriginParam { "Down Origin", 0, 0, 360 };
-	ofParameter<int> downLedArcParam { "Down Arc", 360, 0, 360 };
 
 	static const float OSC_ACTIVITY_FADE_TIME; // How long the dot stays visible
 
@@ -120,7 +101,6 @@ private:
 	ofParameter<void> allOffBtnParam;
 	ofParameter<void> ledsOffBtnParam;
 	ofParameter<void> setZeroAllBtnParam; // New param for Set Zero All
-	ofParameter<int> downPwm; // This seems like a leftover, should it be named or grouped?
 
 	// Direct UI elements (Buttons, Text Inputs)
 	ofxButton connectBtn, disconnectBtn;
@@ -130,16 +110,9 @@ private:
 	ofxIntField relativeAngleInput, absoluteAngleInput; // Text input for precise angle control
 	ofxFloatField gearRatioInput, calibrationFactorInput; // Text input for precise calibration control
 
-	// UI sliders for LED effect parameters (separate for up and down)
-	// These ofxIntSlider objects might become redundant if panels directly use ofParameter<int>
-	// or if they are managed more generically. For now, keeping them if they are explicitly used.
 	ofxIntSlider framerateSlider;
-	ofxIntSlider upLedBlendSlider, upLedOriginSlider, upLedArcSlider;
-	ofxIntSlider downLedBlendSlider, downLedOriginSlider, downLedArcSlider;
 
 	int currentHourGlass; // Index of the currently selected HourGlass
-	ofColor lastUpColor; // To detect changes for sync
-	ofColor lastDownColor; // To detect changes for sync
 	bool isUpdatingFromEffects; // Flag to prevent feedback loops with effects system
 	float lastOSCMessageTime; // For OSC activity indicator
 
@@ -161,7 +134,6 @@ private:
 	void onMoveAbsolutePressed();
 	void onMoveRelativeAnglePressed();
 	void onMoveAbsoluteAnglePressed();
-	void syncColorsChanged(bool & enabled);
 	void onAllOffPressed();
 	void onLedsOffPressed();
 	void onSetZeroAllPressed(); // Declaration for the new handler
@@ -169,29 +141,18 @@ private:
 	// Motor parameter listeners
 	void onMotorEnabledChanged(bool & enabled);
 	void onMicrostepChanged(int & value);
-	void onMotorSpeedChanged(int & value);
 	void onMotorAccelerationChanged(int & value);
-	void onGearRatioChanged(float & value);
-	void onCalibrationFactorChanged(float & value);
 
-	// LED parameter listeners (RGB Color, Main LED, PWM)
+	// LED parameter listeners (bound to the current HourGlass's parameters;
+	// they mirror up<->down when "Sync Controllers" is enabled)
 	void onUpLedColorChanged(ofColor & color);
 	void onDownLedColorChanged(ofColor & color);
-	void onUpMainLedChanged(int & value);
-	void onDownMainLedChanged(int & value);
-	void onUpPwmChanged(int & value);
-	void onDownPwmChanged(int & value);
-
-	// Original individual listeners for LED Effect int parameters (Blend, Origin, Arc)
 	void onUpLedBlendChanged(int & value);
 	void onUpLedOriginChanged(int & value);
 	void onUpLedArcChanged(int & value);
 	void onDownLedBlendChanged(int & value);
 	void onDownLedOriginChanged(int & value);
 	void onDownLedArcChanged(int & value);
-
-	// OSC Parameter Sync
-	ofxOscParameterSync oscSync;
 
 	// Status display
 	void drawStatus();
@@ -202,10 +163,6 @@ private:
 	void handleMotorCommands(int key);
 	void handleLEDCommands(int key);
 	void handleViewToggle(int key); // Added declaration
-
-	// Throttling for color updates
-	// float lastColorUpdateTime; // Commented out as unused
-	// const float COLOR_UPDATE_INTERVAL = 0.05f; // Commented out as unused
 
 	// Helper method for color presets
 	void setColorPreset(const ofColor & color);

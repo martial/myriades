@@ -11,12 +11,6 @@ class OSCController; // For access to sendError, if needed, though trying to mak
 
 class OSCHelper {
 public:
-	// Generic clamp function
-	template <typename T>
-	static const T & clamp(const T & value, const T & low, const T & high) {
-		return std::max(low, std::min(value, high));
-	}
-
 	// Parameter validation (logs error internally if invalid)
 	static bool validateParameters(const ofxOscMessage & msg, int expectedCount, const std::string & commandContext);
 

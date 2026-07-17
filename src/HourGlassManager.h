@@ -15,6 +15,9 @@ public:
 	bool saveConfiguration(const std::string & configFile = "hourglasses.json");
 	void createDefaultConfiguration();
 
+	// Per-frame hardware tick: effects, LED sends, pending motor commands
+	void update(float deltaTime);
+
 	// HourGlass management
 	void addHourGlass(const std::string & name, int upLedId, int downLedId, int motorId);
 	bool removeHourGlass(const std::string & name);
@@ -31,7 +34,19 @@ public:
 	void enableAllMotors();
 	void disableAllMotors();
 	void emergencyStopAll();
+	void setZeroAll();
 	void setAllLEDs(uint8_t r, uint8_t g, uint8_t b);
+
+	// Invalidate all LED last-sent caches so next frame re-sends (e.g. after luminosity changes)
+	void refreshAllLedStates();
+
+	// Apply fn to every hourglass
+	template <typename F>
+	void forEachHourGlass(F fn) {
+		for (auto & hourglass : hourglasses) {
+			fn(*hourglass);
+		}
+	}
 
 	// Status and info
 	size_t getHourGlassCount() const { return hourglasses.size(); }

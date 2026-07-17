@@ -102,7 +102,6 @@
 		"13AFED8B-53A7-4CD7-A91E-B8F8379A5C0D" /* OscHostEndianness.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = OscHostEndianness.h; sourceTree = "<group>"; };
 		1440A9CB2DE99FE000D8473C /* ArcCosineEffect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArcCosineEffect.h; sourceTree = "<group>"; };
 		1440A9CC2DE99FE000D8473C /* ArcCosineEffect.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ArcCosineEffect.cpp; sourceTree = "<group>"; };
-		1440A9CD2DE99FE000D8473C /* CalibrationUtility.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CalibrationUtility.h; sourceTree = "<group>"; };
 		1440A9CE2DE99FE000D8473C /* CanProtocol.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CanProtocol.h; sourceTree = "<group>"; };
 		1440A9CF2DE99FE000D8473C /* Effect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Effect.h; sourceTree = "<group>"; };
 		1440A9D02DE99FE000D8473C /* EffectParameters.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EffectParameters.h; sourceTree = "<group>"; };
@@ -596,7 +595,6 @@
 				E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */,
 				1440A9CB2DE99FE000D8473C /* ArcCosineEffect.h */,
 				1440A9CC2DE99FE000D8473C /* ArcCosineEffect.cpp */,
-				1440A9CD2DE99FE000D8473C /* CalibrationUtility.h */,
 				1440A9CE2DE99FE000D8473C /* CanProtocol.h */,
 				1440A9CF2DE99FE000D8473C /* Effect.h */,
 				1440A9D02DE99FE000D8473C /* EffectParameters.h */,

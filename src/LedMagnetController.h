@@ -1,20 +1,12 @@
 #pragma once
 
 #include "ofMain.h"
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
 
 class LedMagnetController {
 public:
-	// Control channel types
-	enum class ControlType : uint8_t {
-		LED = 1,
-		PWM = 2,
-		DOTSTAR = 3
-	};
-
 	// Connection result enum for better error handling
 	enum class ConnectionResult {
 		SUCCESS,
@@ -47,8 +39,6 @@ public:
 	LedMagnetController & sendLED(uint8_t value, float individualLuminosityFactor = 1.0f);
 	LedMagnetController & sendLED(uint8_t r, uint8_t g, uint8_t b, int blend = 0, int origin = 0, int arc = 360, float individualLuminosityFactor = 1.0f, bool enabled = true);
 	LedMagnetController & sendPWM(uint8_t value);
-	LedMagnetController & sendDotStar(uint8_t r, uint8_t g, uint8_t b, uint8_t brightness = 255);
-	LedMagnetController & sendDotStar(const ofColor & color, uint8_t brightness = 255);
 
 	// Unified LED command - sends all parameters in one consistent format
 	LedMagnetController & sendAllLEDParameters(
@@ -67,7 +57,6 @@ public:
 	static float getGlobalLuminosity();
 
 	// Generic send method
-	bool send(ControlType type, const std::vector<uint8_t> & data);
 	bool send(const std::vector<uint8_t> & data);
 
 	// Current protocol state
@@ -86,15 +75,6 @@ public:
 	bool isRgbInitialized() const { return rgbInitialized; }
 	bool isMainLedInitialized() const { return mainLedInitialized; }
 	bool isPwmInitialized() const { return pwmInitialized; }
-
-	// For rate-limiting/logging send frequency
-	float lastSendTime;
-
-	// Timing statistics for average calculation
-	std::vector<float> timingHistory;
-	static constexpr size_t MAX_TIMING_SAMPLES = 100; // Keep last 100 samples
-	float totalTime;
-	size_t sampleCount;
 
 	// Last sent values to prevent redundant serial commands
 	ofColor lastSentRGB;
@@ -126,7 +106,7 @@ public:
 	// RGB optimization methods
 	static void initializeLUT();
 
-	// Force reset of "last sent" values (fixes Main LED bug when switching hourglasses)
+	// Invalidate luminosity-modulated caches (rgb + main LED) so next send re-transmits
 	void resetLastSentValues();
 
 private:
@@ -136,14 +116,6 @@ private:
 	int id = 11;
 	bool ext = false;
 	bool rtr = false;
-
-	// Serial protocol constants removed (no longer needed)
-
-	// Helper to clamp values
-	template <typename T>
-	static T clamp(T value, T min, T max) {
-		return std::max(min, std::min(value, max));
-	}
 
 	// Global luminosity static data
 	static float globalLuminosityValue;

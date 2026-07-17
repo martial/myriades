@@ -53,8 +53,6 @@ public:
 	// Movement commands
 	MotorController & moveRelative(int speed, int accel, int axis);
 	MotorController & moveAbsolute(int speed, int accel, int axis);
-	MotorController & stopRelative(int accel);
-	MotorController & stopAbsolute(int accel);
 
 	// Angle-based movement commands
 	MotorController & moveRelativeAngle(int speed, int accel, float degrees, float gearRatio, float calibrationFactor);
@@ -73,13 +71,6 @@ public:
 	int degreesToAxis(float degrees, float gearRatio, float calibrationFactor) const;
 	float axisToDegrees(int axis, float gearRatio, float calibrationFactor) const;
 
-	// Calibration utilities
-	void startCalibration();
-	float measureActualRotation(float commandedDegrees, float gearRatio, float calibrationFactor);
-	float calculateOptimalGearRatio(float commandedDegrees, float actualDegrees, float currentGearRatio);
-	float calculateOptimalCalibrationFactor(float commandedDegrees, float actualDegrees, float gearRatio);
-	void logCalibrationData(float commanded, float actual, float gearRatio, float calibrationFactor);
-
 private:
 	std::string connectedPortName;
 
@@ -88,30 +79,16 @@ private:
 	bool ext = false;
 	bool rtr = false;
 	int currentMicrostep = 16; // Track current microstep setting
-	static constexpr uint8_t START_BYTE = 0xE7; // 231
-	static constexpr uint8_t END_BYTE = 0x7E; // 126
 
 	// Encoder constants from manual
 	static constexpr int ENCODER_COUNTS_PER_REVOLUTION = 0x4000; // 16384 counts = 360 degrees
 
 	// State for preventing redundant commands
-	bool motorEnabledStateInitialized = false;
-	bool lastMotorEnabledState = false;
 	bool microstepInitialized = false;
 	int lastMicrostepValue = 0;
 	// Note: Movement commands are already handled by HourGlass's flag system
 	// to be one-shot, so MotorController doesn't need to cache last move target/speed/accel.
 
-	// Build protocol packet (same as CAN protocol)
-	std::vector<uint8_t> buildPacket(const std::vector<uint8_t> & data) const;
-
-	// Helper functions
-	template <typename T>
-	static T clamp(T value, T min, T max) {
-		return value < min ? min : (value > max ? max : value);
-	}
-
-	// Convert multi-byte values to byte arrays
-	std::vector<uint8_t> speedToBytes(int speed) const;
-	std::vector<uint8_t> axisToBytes(int axis) const;
+	// Shared packet builder for MOVE_RELATIVE / MOVE_ABSOLUTE
+	MotorController & sendMove(MotorCommand command, int speed, int accel, int axis);
 };

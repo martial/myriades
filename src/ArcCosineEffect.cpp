@@ -32,9 +32,5 @@ void ArcCosineEffect::apply(EffectParameters & params) {
 	// When cosValue is -1, result is minArc.
 	// When cosValue is  1, result is maxArc.
 	float newArc = minArc + (cosValue + 1.0f) * 0.5f * (maxArc - minArc);
-
-	ofLogVerbose("ArcCosineEffect::apply") << "Applying. Old Arc: " << params.arc
-										   << " New Arc: " << static_cast<int>(newArc)
-										   << " ElapsedTime: " << elapsedTime; // UNCOMMENTED
 	params.arc = static_cast<int>(newArc);
 }

@@ -183,6 +183,30 @@ void HourGlassManager::emergencyStopAll() {
 	}
 }
 
+void HourGlassManager::setZeroAll() {
+	for (auto & hourglass : hourglasses) {
+		if (hourglass->isConnected()) {
+			hourglass->setMotorZero();
+		}
+	}
+}
+
+void HourGlassManager::refreshAllLedStates() {
+	for (auto & hourglass : hourglasses) {
+		hourglass->refreshLedState();
+	}
+}
+
+void HourGlassManager::update(float deltaTime) {
+	for (auto & hourglass : hourglasses) {
+		hourglass->updateEffects(deltaTime);
+		if (hourglass->isConnected()) {
+			hourglass->applyLedParameters();
+			hourglass->applyMotorParameters();
+		}
+	}
+}
+
 void HourGlassManager::setAllLEDs(uint8_t r, uint8_t g, uint8_t b) {
 	for (auto & hourglass : hourglasses) {
 		hourglass->setAllLEDs(r, g, b);

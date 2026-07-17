@@ -12,11 +12,7 @@ UIWrapper::UIWrapper()
 	, hourglassManager(nullptr)
 	, currentHourGlass(0)
 	, isUpdatingFromEffects(false)
-	, lastOSCMessageTime(0)
-// , lastColorUpdateTime(0) // This member was commented out in UIWrapper.h
-{
-	lastUpColor = ofColor::black;
-	lastDownColor = ofColor::black;
+	, lastOSCMessageTime(0) {
 }
 
 UIWrapper::~UIWrapper() {
@@ -40,7 +36,7 @@ void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl) {
 	ledVisualizer.setLayoutMode(0); // Grid layout
 	ledVisualizer.setShowLabels(false); // No labels for compact view
 	ledVisualizer.setShowGrid(false);
-	ledVisualizer.setUIWrapper(this); // Give visualizer access to UI parameters
+	ledVisualizer.setUIWrapper(this); // Give visualizer access to the current selection
 
 	// Add all hourglasses to visualizer
 	for (int i = 0; i < hourglassManager->getHourGlassCount(); i++) {
@@ -61,32 +57,13 @@ void UIWrapper::setup(HourGlassManager * manager, OSCController * oscCtrl) {
 }
 
 void UIWrapper::update() {
-	// Update OSC parameter sync (disabled)
-	// oscSync.update();
-
 	// Update LED visualizer
 	ledVisualizer.update();
 
-	// Update effects for all hourglasses
+	// Per-frame hardware tick: effects, LED sends, pending motor commands
 	if (hourglassManager) {
-		float deltaTime = ofGetLastFrameTime();
-		for (int i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
-			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg) {
-				hg->updateEffects(deltaTime);
-				if (hg->isConnected()) {
-					hg->applyLedParameters();
-					hg->applyMotorParameters();
-				}
-			}
-		}
+		hourglassManager->update(ofGetLastFrameTime());
 	}
-
-	// Debug: Check parameter values (Removed unused debugFrameCount)
-	// static int debugFrameCount = 0; // Removed
-	// debugFrameCount++; // Removed
-
-	// Remove the debug logging section completely
 }
 
 void UIWrapper::draw() {
@@ -98,7 +75,6 @@ void UIWrapper::draw() {
 		ledDownPanel.draw();
 		luminosityPanel.draw();
 		effectsPanel.draw();
-		// globalSettingsPanel.draw(); // Removed: Will be part of settingsPanel
 
 		// Draw enhanced status panel
 		drawStatus();
@@ -113,10 +89,7 @@ void UIWrapper::draw() {
 }
 
 void UIWrapper::drawMinimalView() {
-	// Placeholder implementation
 	ofSetBackgroundColor(0); // Black background for minimal view
-	// ofSetColor(255); // Color will be set by individual HourGlass::drawMinimal calls
-	// ofDrawBitmapString("MINIMAL VIEW - TODO: Implement HourGlass::drawMinimal() and call it here for each HG", 20, 20);
 
 	if (hourglassManager) {
 		int yOffset = 20; // Initial Y offset
@@ -152,7 +125,6 @@ void UIWrapper::setupStyledPanel(ofxPanel & panel, const std::string & panelName
 void UIWrapper::setupPanels() {
 	// Calculate panel dimensions for 5 horizontal panels - made even more compact
 	int panelWidth = 225;
-	// int panelHeight = 300; // Removed: (Unused variable)
 	int panelSpacing = 15;
 	int startX = 15;
 	int startY = 20;
@@ -227,14 +199,11 @@ void UIWrapper::setupPanels() {
 	setupStyledPanel(ledUpPanel, "UP LED CONTROLLER", "led_up.xml", startX + (panelWidth + panelSpacing) * 2, startY);
 
 	// NOTE: LED panel contents will be populated by updateUIPanelsBinding()
-	// Up LED Effect Parameters are initialized with names and values in UIWrapper.h
-	// No need to .set() them here again unless overriding defaults for a specific reason.
 
 	// === PANEL 4: DOWN LED CONTROLLER (Center-Right) ===
 	setupStyledPanel(ledDownPanel, "DOWN LED CONTROLLER", "led_down.xml", startX + (panelWidth + panelSpacing) * 3, startY);
 
 	// NOTE: LED panel contents will be populated by updateUIPanelsBinding()
-	// Down LED Effect Parameters are initialized with names and values in UIWrapper.h
 
 	// === PANEL 5: MODULE LUMINOSITY (Right) ===
 	setupStyledPanel(luminosityPanel, "MODULE LUMINOSITY", "luminosity.xml", startX + (panelWidth + panelSpacing) * 4, startY);
@@ -255,8 +224,6 @@ void UIWrapper::setupPanels() {
 	luminosityPanel.add(&currentHgIndividualLuminositySlider);
 
 	// === PANEL 6: EFFECTS (New) ===
-	// Adjust panelWidth, panelHeight, panelSpacing, startX, startY as needed.
-	// Assuming 5 panels before this, so index 5
 	int effectsPanelX = startX + (panelWidth + panelSpacing) * 5;
 	setupStyledPanel(effectsPanel, "EFFECTS", "effects.xml", effectsPanelX, startY);
 
@@ -281,27 +248,11 @@ void UIWrapper::setupListeners() {
 	moveRelativeAngleBtn.addListener(this, &UIWrapper::onMoveRelativeAnglePressed);
 	moveAbsoluteAngleBtn.addListener(this, &UIWrapper::onMoveAbsoluteAnglePressed);
 
-	// LED listeners
-	syncColorsParam.addListener(this, &UIWrapper::syncColorsChanged);
-
 	// Add listener for individual luminosity
 	currentHgIndividualLuminosityParam.addListener(this, &UIWrapper::onIndividualLuminosityChanged);
 
-	// Listeners for LED effect parameters (Blend, Origin, Arc) - Reverted to original individual listeners
-	upLedBlendParam.addListener(this, &UIWrapper::onUpLedBlendChanged);
-	upLedOriginParam.addListener(this, &UIWrapper::onUpLedOriginChanged);
-	upLedArcParam.addListener(this, &UIWrapper::onUpLedArcChanged);
-	downLedBlendParam.addListener(this, &UIWrapper::onDownLedBlendChanged);
-	downLedOriginParam.addListener(this, &UIWrapper::onDownLedOriginChanged);
-	downLedArcParam.addListener(this, &UIWrapper::onDownLedArcChanged);
-
-	// Setup OSC parameter sync for the first hourglass
-	if (hourglassManager->getHourGlassCount() > 0) {
-		// Disable ofxOscParameterSync for now, use OSCController for everything
-		// oscSync.setup(hg->getParameterGroup(), 9000, "localhost", 9001);
-
-		// NOTE: Parameter listeners will be set up by updateListenersForCurrentHourglass()
-	}
+	// NOTE: HourGlass parameter listeners (colors, blend/origin/arc, motor params)
+	// are managed per-selection by updateListenersForCurrentHourglass()
 
 	// Quick action listeners
 	allOffBtn.addListener(this, &UIWrapper::onAllOffPressed);
@@ -352,12 +303,12 @@ void UIWrapper::drawStatusSection_KeyboardShortcuts(float x, float & y, float li
 	ofDrawBitmapString("Keyboard Shortcuts:", x, y);
 	y += lineHeight; // Start shortcuts on the next line
 
-	std::vector<std::string> shortcuts = {
+	static const char * const shortcuts[] = {
 		"1-2: Select HG", "c/x: Connect/Disconnect",
 		"z: Zero Motor", "s: Stop Motor (Emerg.)",
 		"Arrows: Rotate Motor", "u/d: Move Steps (Rel)"
 	};
-	for (const auto & shortcut : shortcuts) {
+	for (const char * shortcut : shortcuts) {
 		ofDrawBitmapString(shortcut, x, y);
 		y += lineHeight;
 	}
@@ -368,7 +319,7 @@ void UIWrapper::drawStatusSection_OSC(float x, float & y, float lineHeight) {
 	y += 30; // Additional fixed space, adjust as needed
 
 	ofSetColor(100);
-	ofDrawLine(x, y - lineHeight, x + 100, y - lineHeight); // Adjust width of separator as needed, e.g., (rightSectionWidth - 60)
+	ofDrawLine(x, y - lineHeight, x + 100, y - lineHeight);
 
 	ofSetColor(220, 220, 220);
 	y += lineHeight; // Position for OSC text
@@ -456,8 +407,6 @@ void UIWrapper::handleMotorCommands(int key) {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (!hg || !hg->isConnected()) return;
 
-	// motorEnabled and emergencyStop/setZero can still be direct or go through command methods if preferred
-	// For movement commands:
 	switch (key) {
 	case 'u': // Move motor up
 		hg->commandRelativeMove(1000); // Example steps
@@ -484,9 +433,6 @@ void UIWrapper::handleMotorCommands(int key) {
 
 		break;
 	}
-	// Ensure motorEnabled changes also call hg->motorEnabled.set() so applyMotorParameters picks it up.
-	// if (key == 'e') hg->motorEnabled.set(true);
-	// if (key == 'q') hg->motorEnabled.set(false);
 }
 
 void UIWrapper::handleLEDCommands(int key) {
@@ -510,12 +456,7 @@ void UIWrapper::handleLEDCommands(int key) {
 
 void UIWrapper::handleViewToggle(int key) {
 	if (key == 'v') { // 'v' for view toggle
-		if (currentViewMode == DETAILED_VIEW) {
-			currentViewMode = MINIMAL_VIEW;
-
-		} else {
-			currentViewMode = DETAILED_VIEW;
-		}
+		currentViewMode = (currentViewMode == DETAILED_VIEW) ? MINIMAL_VIEW : DETAILED_VIEW;
 	}
 }
 
@@ -526,17 +467,12 @@ void UIWrapper::hourglassSelectorChanged(int & selection) {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg) {
 		// CRITICAL: Update UI panels to bind to the newly selected hourglass's state
-		// This will also handle syncing UIWrapper's parameters like upLedBlendParam, etc.
 		updateUIPanelsBinding();
 	} else {
 		// Optionally disable or set to a default if no valid HG is selected
-		// For parameters like currentHgIndividualLuminosityParam
 		currentHgIndividualLuminosityParam.removeListener(this, &UIWrapper::onIndividualLuminosityChanged);
 		currentHgIndividualLuminosityParam.set(1.0f); // Default to full if HG invalid
 		currentHgIndividualLuminosityParam.addListener(this, &UIWrapper::onIndividualLuminosityChanged);
-		// Similar for blend/origin/arc if a default "no hg selected" state is desired for their sliders
-		// For now, they will retain the values from the last valid hg, or their initial values.
-		// updateUIPanelsBinding() handles clearing/rebuilding panels, which is often sufficient visual feedback.
 	}
 }
 
@@ -544,49 +480,33 @@ void UIWrapper::updateUIPanelsBinding() {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (!hg) return;
 
-	// Set the flag to prevent listeners from acting during this batch update from HG state
+	// Prevent listeners from acting during this batch rebind from HG state
 	isInternallySyncing = true;
 
-	// Update UIWrapper's parameters from the HourGlass state.
-	// Their listeners WILL fire, but the generic handler (and others if modified)
-	// should exit early due to isInternallySyncing == true.
-	upLedBlendParam.set(hg->upLedBlend.get());
-	upLedOriginParam.set(hg->upLedOrigin.get());
-	upLedArcParam.set(hg->upLedArc.get());
-
-	downLedBlendParam.set(hg->downLedBlend.get());
-	downLedOriginParam.set(hg->downLedOrigin.get());
-	downLedArcParam.set(hg->downLedArc.get());
-
-	// Also update the individual luminosity UI parameter
-	// Assuming onIndividualLuminosityChanged also checks isInternallySyncing or hg->updatingFromOSC
+	// Sync the individual luminosity UI parameter from the HourGlass
 	currentHgIndividualLuminosityParam.set(hg->individualLuminosity.get());
 
-	// Clear the flag once all relevant UI parameters are synced from HourGlass state
-	isInternallySyncing = false;
-
 	// Clear and rebuild panels with correct hourglass bindings
-	// Note: The .add() method for panels will use the current values of the parameters.
 	ledUpPanel.clear();
 	ledDownPanel.clear();
 	motorPanel.clear(); // Also clear motor panel to re-add its specific elements like buttons
 
-	// === UP LED PANEL ===
-	ledUpPanel.add(hg->upLedColor.set("RGB Color", hg->upLedColor.get())); // Uses HG's param directly
-	ledUpPanel.add(hg->upMainLed.set("Main LED", hg->upMainLed.get(), 0, 255)); // Uses HG's param directly
-	ledUpPanel.add(hg->upPwm.set("PWM", hg->upPwm.get(), 0, 255)); // Uses HG's param directly
-	ledUpPanel.add(upLedBlendParam); // Uses UIWrapper's param (now synced)
-	ledUpPanel.add(upLedOriginParam); // Uses UIWrapper's param (now synced)
-	ledUpPanel.add(upLedArcParam); // Uses UIWrapper's param (now synced)
+	// === UP LED PANEL === (panels bind the HourGlass's own parameters)
+	ledUpPanel.add(hg->upLedColor.set("RGB Color", hg->upLedColor.get()));
+	ledUpPanel.add(hg->upMainLed.set("Main LED", hg->upMainLed.get(), 0, 255));
+	ledUpPanel.add(hg->upPwm.set("PWM", hg->upPwm.get(), 0, 255));
+	ledUpPanel.add(hg->upLedBlend.set("Up Blend", hg->upLedBlend.get(), 0, 768));
+	ledUpPanel.add(hg->upLedOrigin.set("Up Origin", hg->upLedOrigin.get(), 0, 360));
+	ledUpPanel.add(hg->upLedArc.set("Up Arc", hg->upLedArc.get(), 0, 360));
 	ledUpPanel.getGroup("RGB Color").maximize();
 
 	// === DOWN LED PANEL ===
-	ledDownPanel.add(hg->downLedColor.set("RGB Color", hg->downLedColor.get())); // Uses HG's param directly
-	ledDownPanel.add(hg->downMainLed.set("Main LED", hg->downMainLed.get(), 0, 255)); // Uses HG's param directly
-	ledDownPanel.add(hg->downPwm.set("PWM", hg->downPwm.get(), 0, 255)); // Uses HG's param directly
-	ledDownPanel.add(downLedBlendParam); // Uses UIWrapper's param (now synced)
-	ledDownPanel.add(downLedOriginParam); // Uses UIWrapper's param (now synced)
-	ledDownPanel.add(downLedArcParam); // Uses UIWrapper's param (now synced)
+	ledDownPanel.add(hg->downLedColor.set("RGB Color", hg->downLedColor.get()));
+	ledDownPanel.add(hg->downMainLed.set("Main LED", hg->downMainLed.get(), 0, 255));
+	ledDownPanel.add(hg->downPwm.set("PWM", hg->downPwm.get(), 0, 255));
+	ledDownPanel.add(hg->downLedBlend.set("Down Blend", hg->downLedBlend.get(), 0, 768));
+	ledDownPanel.add(hg->downLedOrigin.set("Down Origin", hg->downLedOrigin.get(), 0, 360));
+	ledDownPanel.add(hg->downLedArc.set("Down Arc", hg->downLedArc.get(), 0, 360));
 	ledDownPanel.getGroup("RGB Color").maximize();
 
 	// === MOTOR PANEL ===
@@ -603,8 +523,8 @@ void UIWrapper::updateUIPanelsBinding() {
 	// UI Input parameters (these don't need to be set from hg, they are inputs for actions)
 	motorPanel.add(relativePositionParam);
 	motorPanel.add(absolutePositionParam);
-	motorPanel.add(&relativeAngleInput); // Assuming relativeAngleInput is setup with relativeAngleParam
-	motorPanel.add(&absoluteAngleInput); // Assuming absoluteAngleInput is setup with absoluteAngleParam
+	motorPanel.add(&relativeAngleInput);
+	motorPanel.add(&absoluteAngleInput);
 
 	// Buttons
 	motorPanel.add(&emergencyStopBtn);
@@ -614,9 +534,7 @@ void UIWrapper::updateUIPanelsBinding() {
 	motorPanel.add(&moveRelativeAngleBtn);
 	motorPanel.add(&moveAbsoluteAngleBtn);
 
-	// LUMINOSITY PANEL (already has its own logic for currentHgIndividualLuminosityParam syncing)
-	// We added explicit sync for currentHgIndividualLuminosityParam at the top of this function.
-	// The luminosityPanel itself likely adds currentHgIndividualLuminositySlider which is bound to currentHgIndividualLuminosityParam.
+	isInternallySyncing = false;
 
 	// Update listeners for the newly selected hourglass (for parameters directly from HourGlass)
 	updateListenersForCurrentHourglass();
@@ -629,16 +547,15 @@ void UIWrapper::updateListenersForCurrentHourglass() {
 		if (hg) {
 			hg->motorEnabled.removeListener(this, &UIWrapper::onMotorEnabledChanged);
 			hg->microstep.removeListener(this, &UIWrapper::onMicrostepChanged);
-			hg->motorSpeed.removeListener(this, &UIWrapper::onMotorSpeedChanged);
 			hg->motorAcceleration.removeListener(this, &UIWrapper::onMotorAccelerationChanged);
-			hg->gearRatio.removeListener(this, &UIWrapper::onGearRatioChanged);
-			hg->calibrationFactor.removeListener(this, &UIWrapper::onCalibrationFactorChanged);
 			hg->upLedColor.removeListener(this, &UIWrapper::onUpLedColorChanged);
 			hg->downLedColor.removeListener(this, &UIWrapper::onDownLedColorChanged);
-			hg->upMainLed.removeListener(this, &UIWrapper::onUpMainLedChanged);
-			hg->downMainLed.removeListener(this, &UIWrapper::onDownMainLedChanged);
-			hg->upPwm.removeListener(this, &UIWrapper::onUpPwmChanged);
-			hg->downPwm.removeListener(this, &UIWrapper::onDownPwmChanged);
+			hg->upLedBlend.removeListener(this, &UIWrapper::onUpLedBlendChanged);
+			hg->upLedOrigin.removeListener(this, &UIWrapper::onUpLedOriginChanged);
+			hg->upLedArc.removeListener(this, &UIWrapper::onUpLedArcChanged);
+			hg->downLedBlend.removeListener(this, &UIWrapper::onDownLedBlendChanged);
+			hg->downLedOrigin.removeListener(this, &UIWrapper::onDownLedOriginChanged);
+			hg->downLedArc.removeListener(this, &UIWrapper::onDownLedArcChanged);
 		}
 	}
 
@@ -647,16 +564,15 @@ void UIWrapper::updateListenersForCurrentHourglass() {
 	if (hg) {
 		hg->motorEnabled.addListener(this, &UIWrapper::onMotorEnabledChanged);
 		hg->microstep.addListener(this, &UIWrapper::onMicrostepChanged);
-		hg->motorSpeed.addListener(this, &UIWrapper::onMotorSpeedChanged);
 		hg->motorAcceleration.addListener(this, &UIWrapper::onMotorAccelerationChanged);
-		hg->gearRatio.addListener(this, &UIWrapper::onGearRatioChanged);
-		hg->calibrationFactor.addListener(this, &UIWrapper::onCalibrationFactorChanged);
 		hg->upLedColor.addListener(this, &UIWrapper::onUpLedColorChanged);
 		hg->downLedColor.addListener(this, &UIWrapper::onDownLedColorChanged);
-		hg->upMainLed.addListener(this, &UIWrapper::onUpMainLedChanged);
-		hg->downMainLed.addListener(this, &UIWrapper::onDownMainLedChanged);
-		hg->upPwm.addListener(this, &UIWrapper::onUpPwmChanged);
-		hg->downPwm.addListener(this, &UIWrapper::onDownPwmChanged);
+		hg->upLedBlend.addListener(this, &UIWrapper::onUpLedBlendChanged);
+		hg->upLedOrigin.addListener(this, &UIWrapper::onUpLedOriginChanged);
+		hg->upLedArc.addListener(this, &UIWrapper::onUpLedArcChanged);
+		hg->downLedBlend.addListener(this, &UIWrapper::onDownLedBlendChanged);
+		hg->downLedOrigin.addListener(this, &UIWrapper::onDownLedOriginChanged);
+		hg->downLedArc.addListener(this, &UIWrapper::onDownLedArcChanged);
 	}
 }
 
@@ -686,8 +602,6 @@ void UIWrapper::onSetZeroPressed() {
 void UIWrapper::onMoveRelativePressed() {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && hg->isConnected()) {
-		// Use the UI's current values for speed/accel from ofParameters if not overridden
-		// The command methods now take std::optional for speed/accel
 		hg->commandRelativeMove(relativePositionParam.get());
 	}
 }
@@ -713,9 +627,6 @@ void UIWrapper::onMoveAbsoluteAnglePressed() {
 	}
 }
 
-void UIWrapper::syncColorsChanged(bool & enabled) {
-}
-
 void UIWrapper::onAllOffPressed() {
 	// Prevent multiple triggers
 	static float lastPressTime = 0;
@@ -730,18 +641,13 @@ void UIWrapper::onAllOffPressed() {
 		// Set flag to prevent feedback
 		isUpdatingFromEffects = true;
 
-		// Use safe parameter setting instead of dangerous direct hardware access
-		// These will be applied by applyLedParameters() in the update loop
+		// Use safe parameter setting; applied by applyLedParameters() in the update loop
 		hg->upLedColor.set(ofColor::black);
 		hg->downLedColor.set(ofColor::black);
 		hg->upMainLed.set(0);
 		hg->downMainLed.set(0);
 		hg->upPwm.set(0);
 		hg->downPwm.set(0);
-
-		// Update last colors
-		lastUpColor = ofColor::black;
-		lastDownColor = ofColor::black;
 
 		// Clear flag
 		isUpdatingFromEffects = false;
@@ -794,36 +700,20 @@ void UIWrapper::onMicrostepChanged(int & value) {
 	}
 }
 
-void UIWrapper::onMotorSpeedChanged(int & value) {
-	// Motor speed is just a parameter for the next movement command
-	// No immediate hardware command needed
-}
-
 void UIWrapper::onMotorAccelerationChanged(int & value) {
-	// Motor acceleration is just a parameter for the next movement command
-	// No immediate hardware command needed, but HourGlass might apply it if motor is enabled.
+	// Motor acceleration is just a parameter for the next movement command,
+	// but HourGlass might apply it if motor is enabled.
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && hg->isConnected() && !hg->updatingFromOSC) {
-		hg->applyMotorParameters(); // This will now use the int acceleration value
+		hg->applyMotorParameters();
 	}
 }
 
-void UIWrapper::onGearRatioChanged(float & value) {
-	// Gear ratio doesn't need immediate hardware application
-	// It's used in calculations for motor movements
-}
-
-void UIWrapper::onCalibrationFactorChanged(float & value) {
-	// Calibration factor doesn't need immediate hardware application
-	// It's used in calculations for motor movements
-}
-
-// LED parameter listeners - apply changes to hardware when sliders change
+// LED parameter listeners - mirror up<->down when "Sync Controllers" is enabled
 void UIWrapper::onUpLedColorChanged(ofColor & color) {
 	if (isUpdatingFromEffects) return;
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && !hg->updatingFromOSC) {
-		hg->upLedColor.set(color);
 		if (syncColorsParam.get()) {
 			hg->downLedColor.set(color);
 		}
@@ -834,38 +724,75 @@ void UIWrapper::onDownLedColorChanged(ofColor & color) {
 	if (isUpdatingFromEffects) return;
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && !hg->updatingFromOSC) {
-		hg->downLedColor.set(color);
 		if (syncColorsParam.get()) {
 			hg->upLedColor.set(color);
 		}
 	}
 }
 
-void UIWrapper::onUpMainLedChanged(int & value) {
-	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (hg && !hg->updatingFromOSC) {
-		hg->upMainLed.set(value);
+void UIWrapper::onUpLedBlendChanged(int & value) {
+	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (!hg || hg->updatingFromOSC || isInternallySyncing) return;
+
+	if (syncColorsParam.get()) {
+		isInternallySyncing = true;
+		hg->downLedBlend.set(value);
+		isInternallySyncing = false;
 	}
 }
 
-void UIWrapper::onDownMainLedChanged(int & value) {
-	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (hg && !hg->updatingFromOSC) {
-		hg->downMainLed.set(value);
+void UIWrapper::onUpLedOriginChanged(int & value) {
+	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (!hg || hg->updatingFromOSC || isInternallySyncing) return;
+
+	if (syncColorsParam.get()) {
+		isInternallySyncing = true;
+		hg->downLedOrigin.set(value);
+		isInternallySyncing = false;
 	}
 }
 
-void UIWrapper::onUpPwmChanged(int & value) {
-	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (hg && !hg->updatingFromOSC) {
-		hg->upPwm.set(value);
+void UIWrapper::onUpLedArcChanged(int & value) {
+	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (!hg || hg->updatingFromOSC || isInternallySyncing) return;
+
+	if (syncColorsParam.get()) {
+		isInternallySyncing = true;
+		hg->downLedArc.set(value);
+		isInternallySyncing = false;
 	}
 }
 
-void UIWrapper::onDownPwmChanged(int & value) {
-	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (hg && !hg->updatingFromOSC) {
-		hg->downPwm.set(value);
+void UIWrapper::onDownLedBlendChanged(int & value) {
+	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (!hg || hg->updatingFromOSC || isInternallySyncing) return;
+
+	if (syncColorsParam.get()) {
+		isInternallySyncing = true;
+		hg->upLedBlend.set(value);
+		isInternallySyncing = false;
+	}
+}
+
+void UIWrapper::onDownLedOriginChanged(int & value) {
+	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (!hg || hg->updatingFromOSC || isInternallySyncing) return;
+
+	if (syncColorsParam.get()) {
+		isInternallySyncing = true;
+		hg->upLedOrigin.set(value);
+		isInternallySyncing = false;
+	}
+}
+
+void UIWrapper::onDownLedArcChanged(int & value) {
+	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
+	if (!hg || hg->updatingFromOSC || isInternallySyncing) return;
+
+	if (syncColorsParam.get()) {
+		isInternallySyncing = true;
+		hg->upLedArc.set(value);
+		isInternallySyncing = false;
 	}
 }
 
@@ -1064,16 +991,12 @@ void UIWrapper::loadSettings() {
 			}
 
 			bool syncColors = (uiStateNode.getAttribute("syncColors").getValue() == "true");
-			isInternallySyncing = true; // Prevent listener from firing during this set
 			syncColorsParam.set(syncColors);
-			isInternallySyncing = false;
 
 			int savedSelection = ofToInt(uiStateNode.getAttribute("currentHourGlass").getValue());
 			if (savedSelection >= 0 && savedSelection < hourglassManager->getHourGlassCount()) {
 				currentHourGlass = savedSelection;
-				isInternallySyncing = true; // Prevent listener from firing
 				hourglassSelectorParam.set(currentHourGlass + 1);
-				isInternallySyncing = false;
 			}
 		}
 	}
@@ -1103,15 +1026,13 @@ void UIWrapper::loadSettings() {
 
 	// CRITICAL: Update UI panels to show the loaded hourglass settings for the initially selected one
 	updateUIPanelsBinding();
-
-	// The individual luminosity slider is already updated within updateUIPanelsBinding
 }
 
 // Implement the new listener method
 void UIWrapper::onGlobalLuminosityChanged(float & luminosity) {
 	LedMagnetController::setGlobalLuminosity(luminosity);
-	if (oscControllerInstance) {
-		oscControllerInstance->forceRefreshAllHardwareStates();
+	if (hourglassManager) {
+		hourglassManager->refreshAllLedStates();
 	}
 }
 
@@ -1124,14 +1045,10 @@ void UIWrapper::onFramerateChanged(int & framerate) {
 void UIWrapper::onIndividualLuminosityChanged(float & luminosity) {
 	auto * hg = hourglassManager->getHourGlass(currentHourGlass);
 	if (hg && !hg->updatingFromOSC && !isInternallySyncing) {
-		// Set the ofParameter on the HourGlass object.
-		// This will trigger HourGlass's own internal listeners if it has any to apply changes.
 		hg->individualLuminosity.set(luminosity);
 
-		// Force OSCController to re-evaluate and send all states because effective output will change
-		if (oscControllerInstance) {
-			oscControllerInstance->forceRefreshAllHardwareStates();
-		}
+		// Effective output changed - force re-send of this hourglass's LED state
+		hg->refreshLedState();
 	} else if (!hg) {
 		ofLogWarning("UIWrapper") << "Attempted to change individual luminosity for an invalid HourGlass selection.";
 	}
@@ -1151,103 +1068,6 @@ void UIWrapper::updateCurrentIndividualLuminositySlider(float luminosity) {
 	currentHgIndividualLuminosityParam.addListener(this, &UIWrapper::onIndividualLuminosityChanged);
 }
 
-// --- RE-IMPLEMENT original individual listener definitions ---
-void UIWrapper::onUpLedBlendChanged(int & value) {
-	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (!hg || hg->updatingFromOSC || this->isInternallySyncing) return;
-
-	hg->upLedBlend.set(value);
-
-	if (syncColorsParam.get()) {
-		this->isInternallySyncing = true;
-		downLedBlendParam.set(value); // Update UIWrapper's param
-		if (!hg->updatingFromOSC) { // Check again in case OSC updated hg in a weird timing
-			hg->downLedBlend.set(value); // Update HourGlass's param
-		}
-		this->isInternallySyncing = false;
-	}
-}
-
-void UIWrapper::onUpLedOriginChanged(int & value) {
-	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (!hg || hg->updatingFromOSC || this->isInternallySyncing) return;
-
-	hg->upLedOrigin.set(value);
-
-	if (syncColorsParam.get()) {
-		this->isInternallySyncing = true;
-		downLedOriginParam.set(value);
-		if (!hg->updatingFromOSC) {
-			hg->downLedOrigin.set(value);
-		}
-		this->isInternallySyncing = false;
-	}
-}
-
-void UIWrapper::onUpLedArcChanged(int & value) {
-	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (!hg || hg->updatingFromOSC || this->isInternallySyncing) return;
-
-	hg->upLedArc.set(value);
-
-	if (syncColorsParam.get()) {
-		this->isInternallySyncing = true;
-		downLedArcParam.set(value);
-		if (!hg->updatingFromOSC) {
-			hg->downLedArc.set(value);
-		}
-		this->isInternallySyncing = false;
-	}
-}
-
-void UIWrapper::onDownLedBlendChanged(int & value) {
-	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (!hg || hg->updatingFromOSC || this->isInternallySyncing) return;
-
-	hg->downLedBlend.set(value);
-
-	if (syncColorsParam.get()) {
-		this->isInternallySyncing = true;
-		upLedBlendParam.set(value);
-		if (!hg->updatingFromOSC) {
-			hg->upLedBlend.set(value);
-		}
-		this->isInternallySyncing = false;
-	}
-}
-
-void UIWrapper::onDownLedOriginChanged(int & value) {
-	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (!hg || hg->updatingFromOSC || this->isInternallySyncing) return;
-
-	hg->downLedOrigin.set(value);
-
-	if (syncColorsParam.get()) {
-		this->isInternallySyncing = true;
-		upLedOriginParam.set(value);
-		if (!hg->updatingFromOSC) {
-			hg->upLedOrigin.set(value);
-		}
-		this->isInternallySyncing = false;
-	}
-}
-
-void UIWrapper::onDownLedArcChanged(int & value) {
-	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
-	if (!hg || hg->updatingFromOSC || this->isInternallySyncing) return;
-
-	hg->downLedArc.set(value);
-
-	if (syncColorsParam.get()) {
-		this->isInternallySyncing = true;
-		upLedArcParam.set(value);
-		if (!hg->updatingFromOSC) {
-			hg->upLedArc.set(value);
-		}
-		this->isInternallySyncing = false;
-	}
-}
-
 void UIWrapper::onAddCosineArcEffectPressed() {
 	if (!hourglassManager) return;
 	HourGlass * hg = hourglassManager->getHourGlass(currentHourGlass);
@@ -1255,12 +1075,10 @@ void UIWrapper::onAddCosineArcEffectPressed() {
 		// Add to UP controller
 		auto upEffect = std::make_unique<ArcCosineEffect>(90.0f, 270.0f, 5.0f); // Example params
 		hg->addUpEffect(std::move(upEffect));
-		// ofLogNotice("UIWrapper") << "Added CosineArcEffect to UP for HG " << (currentHourGlass + 1); // COMMENTED BACK
 
 		// Add to DOWN controller
 		auto downEffect = std::make_unique<ArcCosineEffect>(45.0f, 315.0f, 3.5f); // Example params
 		hg->addDownEffect(std::move(downEffect));
-		// ofLogNotice("UIWrapper") << "Added CosineArcEffect to DOWN for HG " << (currentHourGlass + 1); // COMMENTED BACK
 	} else {
 		ofLogWarning("UIWrapper") << "No HourGlass selected to add effect to.";
 	}
@@ -1272,58 +1090,13 @@ void UIWrapper::onClearAllEffectsPressed() {
 	if (hg) {
 		hg->clearUpEffects();
 		hg->clearDownEffects();
-		// ofLogNotice("UIWrapper") << "Cleared all effects for HG " << (currentHourGlass + 1); // COMMENTED BACK
 	} else {
 		ofLogWarning("UIWrapper") << "No HourGlass selected to clear effects from.";
 	}
 }
 
-void UIWrapper::updateUpLedBlendFromOSC(int value) {
-	// Check if the UI is currently displaying the HourGlass that OSC is controlling.
-	// This check is implicitly handled by OSCController before calling these.
-	isInternallySyncing = true;
-	upLedBlendParam.set(value);
-	isInternallySyncing = false;
-}
-
-void UIWrapper::updateUpLedOriginFromOSC(int value) {
-	isInternallySyncing = true;
-	upLedOriginParam.set(value);
-	isInternallySyncing = false;
-}
-
-void UIWrapper::updateUpLedArcFromOSC(int value) {
-	isInternallySyncing = true;
-	upLedArcParam.set(value);
-	isInternallySyncing = false;
-}
-
-void UIWrapper::updateDownLedBlendFromOSC(int value) {
-	isInternallySyncing = true;
-	downLedBlendParam.set(value);
-	isInternallySyncing = false;
-}
-
-void UIWrapper::updateDownLedOriginFromOSC(int value) {
-	isInternallySyncing = true;
-	downLedOriginParam.set(value);
-	isInternallySyncing = false;
-}
-
-void UIWrapper::updateDownLedArcFromOSC(int value) {
-	isInternallySyncing = true;
-	downLedArcParam.set(value);
-	isInternallySyncing = false;
-}
-
 void UIWrapper::onSetZeroAllPressed() {
-
 	if (hourglassManager) {
-		for (int i = 0; i < hourglassManager->getHourGlassCount(); ++i) {
-			HourGlass * hg = hourglassManager->getHourGlass(i);
-			if (hg && hg->isConnected()) {
-				hg->setMotorZero(); // Call the HourGlass method
-			}
-		}
+		hourglassManager->setZeroAll();
 	}
 }
