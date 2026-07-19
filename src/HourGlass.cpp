@@ -214,8 +214,9 @@ void HourGlass::applyMotorParameters() {
 		}
 
 		if (isOSCOutEnabled() && !updatingFromOSC) {
-			// Convert steps to degrees for OSC message (simplified conversion)
-			float degrees = static_cast<float>(targetRelativeSteps) / (gearRatio.get() * calibrationFactor.get());
+			// Mirror steps as degrees using the canonical conversion so the OSC
+			// message matches what an angle command for the same motion would say
+			float degrees = MotorController::axisToDegrees(targetRelativeSteps, gearRatio.get(), calibrationFactor.get());
 			oscOutController->sendMotorRelative(motorId, currentSpeed, currentAccel, degrees);
 		}
 		executeRelativeMove = false;
@@ -226,8 +227,7 @@ void HourGlass::applyMotorParameters() {
 		}
 
 		if (isOSCOutEnabled() && !updatingFromOSC) {
-			// Convert steps to degrees for OSC message (simplified conversion)
-			float degrees = static_cast<float>(targetAbsolutePosition) / (gearRatio.get() * calibrationFactor.get());
+			float degrees = MotorController::axisToDegrees(targetAbsolutePosition, gearRatio.get(), calibrationFactor.get());
 			oscOutController->sendMotorAbsolute(motorId, currentSpeed, currentAccel, degrees);
 		}
 		executeAbsoluteMove = false;

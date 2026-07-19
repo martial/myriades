@@ -134,7 +134,7 @@ MotorController & MotorController::moveAbsoluteAngle(int speed, int accel /* 1-3
 }
 
 // Conversion utilities
-int MotorController::degreesToAxis(float degrees, float gearRatio, float calibrationFactor) const {
+int MotorController::degreesToAxis(float degrees, float gearRatio, float calibrationFactor) {
 
 	float motorDegrees = degrees * gearRatio;
 	float encoderCounts = (motorDegrees / 360.0f) * ENCODER_COUNTS_PER_REVOLUTION;
@@ -143,7 +143,7 @@ int MotorController::degreesToAxis(float degrees, float gearRatio, float calibra
 	return result;
 }
 
-float MotorController::axisToDegrees(int axis, float gearRatio, float calibrationFactor) const {
+float MotorController::axisToDegrees(int axis, float gearRatio, float calibrationFactor) {
 	// Reverse the degreesToAxis process for encoder-based axis values
 
 	// 1. Convert raw axis counts back using calibration factor
