@@ -67,10 +67,9 @@ public:
 	bool isRemote() const { return rtr; }
 	int getCurrentMicrostep() const { return currentMicrostep; }
 
-	// Conversion utilities - the single source of truth for the steps(axis)<->degrees
-	// relationship; static so callers without a motor instance (OSC mirroring) agree
-	static int degreesToAxis(float degrees, float gearRatio, float calibrationFactor);
-	static float axisToDegrees(int axis, float gearRatio, float calibrationFactor);
+	// Conversion utilities
+	int degreesToAxis(float degrees, float gearRatio, float calibrationFactor) const;
+	float axisToDegrees(int axis, float gearRatio, float calibrationFactor) const;
 
 private:
 	std::string connectedPortName;
