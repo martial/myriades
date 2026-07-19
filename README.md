@@ -38,31 +38,51 @@ An open source comprehensive control system for multi-hourglass LED installation
 ## Quick Start
 
 ### Prerequisites
-- openFrameworks 0.12.1 or later
+- **openFrameworks 0.12.1 or later** — older releases (0.11.x and earlier) link the
+  `AGL` framework, which Apple removed from recent macOS SDKs (Xcode 15+). Building
+  against an old OF fails with `ld: framework 'AGL' not found`. Download 0.12.1 from
+  https://openframeworks.cc/download/ (or let `./setup_openframeworks_project.sh` do it).
 - macOS (current build configuration)
-- Serial USB connection to hourglass hardware
+- The app runs OSC-only (in on port 8000, out per `bin/data/hourglasses.json`)
 
 ### Building
+
+Two supported layouts:
+
+**A. Inside an openFrameworks tree (required for Xcode):**
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/myriades-project.git
-cd myriades-project
+cd <your-openframeworks-0.12.1>/apps/myApps
+git clone https://github.com/martial/myriades.git
+cd myriades
 
-# Build using make
-make Release
-
-# Or open in Xcode
-open emptyExample.xcodeproj
+make Release            # or: open emptyExample.xcodeproj
 ```
+
+**B. Anywhere on disk (make only):** clone wherever you like, then point
+`config.make` at your OF install before building:
+```make
+OF_ROOT = /absolute/path/to/of_v0.12.1_osx_release
+```
+The Xcode project cannot use `OF_ROOT` — `Project.xcconfig` hardcodes
+`OF_PATH = ../../..`, so Xcode builds only work with layout A.
 
 ### Running
 ```bash
 # Run the built application
-./bin/emptyExample.app/Contents/MacOS/emptyExample
+./bin/myriades.app/Contents/MacOS/myriades
 
 # Or use the build script
 ./build_and_run.sh
 ```
+
+### Troubleshooting
+
+| Symptom | Cause / fix |
+| --- | --- |
+| `ld: framework 'AGL' not found` | Your openFrameworks is older than 0.12. Use OF **0.12.1+** (AGL no longer exists in current macOS SDKs). |
+| Xcode: red/missing files, undefined symbols | Your checkout predates the project-file fix (2026-07-19) — pull latest `main`. `OSCOutController.cpp` was missing from the Xcode project and removed files were still referenced. |
+| Xcode: `ofMain.h` not found | The repo is not inside `<OF>/apps/myApps/` (layout A above). |
+| App text renders in a fallback bitmap font | `bin/data/fonts/JetBrainsMono-Medium.ttf` is missing — it ships in the repo; make sure `bin/data/` survived your checkout. |
 
 ## OSC API Examples
 

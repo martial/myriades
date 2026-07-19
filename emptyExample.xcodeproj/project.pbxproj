@@ -12,7 +12,7 @@
 		1440A9E62DE99FE000D8473C /* MotorController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9DD2DE99FE000D8473C /* MotorController.cpp */; };
 		1440A9E72DE99FE000D8473C /* UIWrapper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9E52DE99FE000D8473C /* UIWrapper.cpp */; };
 		1440A9E82DE99FE000D8473C /* ArcCosineEffect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9CC2DE99FE000D8473C /* ArcCosineEffect.cpp */; };
-		1440A9E92DE99FE000D8473C /* SerialPortManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9E32DE99FE000D8473C /* SerialPortManager.cpp */; };
+		AA10000000000000000000A2 /* OSCOutController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA10000000000000000000B5 /* OSCOutController.cpp */; };
 		1440A9EA2DE99FE000D8473C /* HourGlassManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9D72DE99FE000D8473C /* HourGlassManager.cpp */; };
 		1440A9EB2DE99FE000D8473C /* LEDVisualizer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9DB2DE99FE000D8473C /* LEDVisualizer.cpp */; };
 		1440A9EC2DE99FE000D8473C /* OSCHelper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1440A9E12DE99FE000D8473C /* OSCHelper.cpp */; };
@@ -103,12 +103,10 @@
 		"13AFED8B-53A7-4CD7-A91E-B8F8379A5C0D" /* OscHostEndianness.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = OscHostEndianness.h; sourceTree = "<group>"; };
 		1440A9CB2DE99FE000D8473C /* ArcCosineEffect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ArcCosineEffect.h; sourceTree = "<group>"; };
 		1440A9CC2DE99FE000D8473C /* ArcCosineEffect.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ArcCosineEffect.cpp; sourceTree = "<group>"; };
-		1440A9CE2DE99FE000D8473C /* CanProtocol.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CanProtocol.h; sourceTree = "<group>"; };
 		1440A9CF2DE99FE000D8473C /* Effect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Effect.h; sourceTree = "<group>"; };
 		1440A9D02DE99FE000D8473C /* EffectParameters.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EffectParameters.h; sourceTree = "<group>"; };
 		1440A9D12DE99FE000D8473C /* EffectsManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EffectsManager.h; sourceTree = "<group>"; };
 		1440A9D22DE99FE000D8473C /* EffectsManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EffectsManager.cpp; sourceTree = "<group>"; };
-		1440A9D32DE99FE000D8473C /* GuiController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GuiController.h; sourceTree = "<group>"; };
 		1440A9D42DE99FE000D8473C /* HourGlass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HourGlass.h; sourceTree = "<group>"; };
 		1440A9D52DE99FE000D8473C /* HourGlass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = HourGlass.cpp; sourceTree = "<group>"; };
 		AA10000000000000000000B1 /* VezerPlayer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = VezerPlayer.cpp; sourceTree = "<group>"; };
@@ -126,8 +124,8 @@
 		1440A9DF2DE99FE000D8473C /* OSCController.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OSCController.cpp; sourceTree = "<group>"; };
 		1440A9E02DE99FE000D8473C /* OSCHelper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OSCHelper.h; sourceTree = "<group>"; };
 		1440A9E12DE99FE000D8473C /* OSCHelper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OSCHelper.cpp; sourceTree = "<group>"; };
-		1440A9E22DE99FE000D8473C /* SerialPortManager.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SerialPortManager.h; sourceTree = "<group>"; };
-		1440A9E32DE99FE000D8473C /* SerialPortManager.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SerialPortManager.cpp; sourceTree = "<group>"; };
+		AA10000000000000000000B4 /* OSCOutController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OSCOutController.h; sourceTree = "<group>"; };
+		AA10000000000000000000B5 /* OSCOutController.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OSCOutController.cpp; sourceTree = "<group>"; };
 		1440A9E42DE99FE000D8473C /* UIWrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = UIWrapper.h; sourceTree = "<group>"; };
 		1440A9E52DE99FE000D8473C /* UIWrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = UIWrapper.cpp; sourceTree = "<group>"; };
 		"14C210E2-DE64-4986-925D-E87153BB0DF2" /* IpEndpointName.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = IpEndpointName.cpp; sourceTree = "<group>"; };
@@ -599,12 +597,10 @@
 				E4B69E1E0A3A1BDC003C02F2 /* ofApp.cpp */,
 				1440A9CB2DE99FE000D8473C /* ArcCosineEffect.h */,
 				1440A9CC2DE99FE000D8473C /* ArcCosineEffect.cpp */,
-				1440A9CE2DE99FE000D8473C /* CanProtocol.h */,
 				1440A9CF2DE99FE000D8473C /* Effect.h */,
 				1440A9D02DE99FE000D8473C /* EffectParameters.h */,
 				1440A9D12DE99FE000D8473C /* EffectsManager.h */,
 				1440A9D22DE99FE000D8473C /* EffectsManager.cpp */,
-				1440A9D32DE99FE000D8473C /* GuiController.h */,
 				1440A9D42DE99FE000D8473C /* HourGlass.h */,
 				1440A9D52DE99FE000D8473C /* HourGlass.cpp */,
 				AA10000000000000000000B1 /* VezerPlayer.cpp */,
@@ -622,8 +618,8 @@
 				1440A9DF2DE99FE000D8473C /* OSCController.cpp */,
 				1440A9E02DE99FE000D8473C /* OSCHelper.h */,
 				1440A9E12DE99FE000D8473C /* OSCHelper.cpp */,
-				1440A9E22DE99FE000D8473C /* SerialPortManager.h */,
-				1440A9E32DE99FE000D8473C /* SerialPortManager.cpp */,
+				AA10000000000000000000B4 /* OSCOutController.h */,
+				AA10000000000000000000B5 /* OSCOutController.cpp */,
 				1440A9E42DE99FE000D8473C /* UIWrapper.h */,
 				1440A9E52DE99FE000D8473C /* UIWrapper.cpp */,
 				E4B69E1F0A3A1BDC003C02F2 /* ofApp.h */,
@@ -778,7 +774,7 @@
 				1440A9E62DE99FE000D8473C /* MotorController.cpp in Sources */,
 				1440A9E72DE99FE000D8473C /* UIWrapper.cpp in Sources */,
 				1440A9E82DE99FE000D8473C /* ArcCosineEffect.cpp in Sources */,
-				1440A9E92DE99FE000D8473C /* SerialPortManager.cpp in Sources */,
+				AA10000000000000000000A2 /* OSCOutController.cpp in Sources */,
 				1440A9EA2DE99FE000D8473C /* HourGlassManager.cpp in Sources */,
 				1440A9EB2DE99FE000D8473C /* LEDVisualizer.cpp in Sources */,
 				1440A9EC2DE99FE000D8473C /* OSCHelper.cpp in Sources */,
