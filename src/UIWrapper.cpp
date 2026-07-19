@@ -995,18 +995,20 @@ void UIWrapper::saveHourGlassToXml(ofXml & hgNode, HourGlass * hg, int hgIndex) 
 	auto upColor = hg->upLedColor.get();
 	auto downColor = hg->downLedColor.get();
 
-	ledsNode.setAttribute("upColorR", ofToString(upColor.r));
-	ledsNode.setAttribute("upColorG", ofToString(upColor.g));
-	ledsNode.setAttribute("upColorB", ofToString(upColor.b));
+	// Cast to int: ofToString on the unsigned char channels would serialize
+	// them as raw characters, corrupting the XML on every save/load cycle
+	ledsNode.setAttribute("upColorR", ofToString(static_cast<int>(upColor.r)));
+	ledsNode.setAttribute("upColorG", ofToString(static_cast<int>(upColor.g)));
+	ledsNode.setAttribute("upColorB", ofToString(static_cast<int>(upColor.b)));
 	ledsNode.setAttribute("upMainLed", ofToString(hg->upMainLed.get()));
 	ledsNode.setAttribute("upPwm", ofToString(hg->upPwm.get()));
 	ledsNode.setAttribute("upBlend", ofToString(hg->upLedBlend.get()));
 	ledsNode.setAttribute("upOrigin", ofToString(hg->upLedOrigin.get()));
 	ledsNode.setAttribute("upArc", ofToString(hg->upLedArc.get()));
 
-	ledsNode.setAttribute("downColorR", ofToString(downColor.r));
-	ledsNode.setAttribute("downColorG", ofToString(downColor.g));
-	ledsNode.setAttribute("downColorB", ofToString(downColor.b));
+	ledsNode.setAttribute("downColorR", ofToString(static_cast<int>(downColor.r)));
+	ledsNode.setAttribute("downColorG", ofToString(static_cast<int>(downColor.g)));
+	ledsNode.setAttribute("downColorB", ofToString(static_cast<int>(downColor.b)));
 	ledsNode.setAttribute("downMainLed", ofToString(hg->downMainLed.get()));
 	ledsNode.setAttribute("downPwm", ofToString(hg->downPwm.get()));
 	ledsNode.setAttribute("downBlend", ofToString(hg->downLedBlend.get()));
