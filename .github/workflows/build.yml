@@ -1,0 +1,75 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# openFrameworks 0.12.1 is required: older releases link the AGL framework,
+# which no longer exists in current macOS SDKs (Xcode 15+).
+env:
+  OF_VERSION: "0.12.1"
+
+jobs:
+  make:
+    name: make Release
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache openFrameworks (incl. compiled core)
+        id: cache-of
+        uses: actions/cache@v4
+        with:
+          path: of_release
+          key: of-${{ env.OF_VERSION }}-osx-make-v1
+
+      - name: Download openFrameworks
+        if: steps.cache-of.outputs.cache-hit != 'true'
+        run: |
+          curl -sL -o of.tar.gz "https://github.com/openframeworks/openFrameworks/releases/download/${OF_VERSION}/of_v${OF_VERSION}_osx_release.tar.gz"
+          tar xzf of.tar.gz
+          mv "of_v${OF_VERSION}_osx_release" of_release
+          rm of.tar.gz
+
+      - name: Build
+        run: make -j3 Release OF_ROOT="$PWD/of_release"
+
+      - name: App exists
+        run: test -x bin/myriades.app/Contents/MacOS/myriades
+
+  xcode:
+    name: xcodebuild Release
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Cache openFrameworks (incl. compiled core)
+        id: cache-of
+        uses: actions/cache@v4
+        with:
+          path: of_release
+          key: of-${{ env.OF_VERSION }}-osx-xcode-v1
+
+      - name: Download openFrameworks
+        if: steps.cache-of.outputs.cache-hit != 'true'
+        run: |
+          curl -sL -o of.tar.gz "https://github.com/openframeworks/openFrameworks/releases/download/${OF_VERSION}/of_v${OF_VERSION}_osx_release.tar.gz"
+          tar xzf of.tar.gz
+          mv "of_v${OF_VERSION}_osx_release" of_release
+          rm of.tar.gz
+
+      # The Xcode project resolves OF via the relative OF_PATH = ../../..,
+      # so the repo must sit at <OF>/apps/<anything>/<project>
+      - name: Place project inside the OF tree
+        run: |
+          mkdir -p of_release/apps/myApps
+          cp -R repo of_release/apps/myApps/myriades
+
+      - name: Build
+        run: |
+          xcodebuild -project of_release/apps/myApps/myriades/myriades.xcodeproj \
+            -target myriades -configuration Release build | tail -20
+          exit "${PIPESTATUS[0]}"
