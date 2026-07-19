@@ -31,7 +31,7 @@ An open source comprehensive control system for multi-hourglass LED installation
 
 ### User Interface
 - **Multi-Hourglass Management**: Support for multiple connected hourglasses
-- **Real-time Monitoring**: Connection status and serial communication statistics
+- **Real-time Monitoring**: Connection status, OSC activity indicator, live LED preview
 - **Parameter Sliders**: Intuitive controls for all LED and motor parameters
 - **Preset Management**: Save and load motor configuration presets
 
@@ -135,12 +135,15 @@ The system supports flexible targeting for LED, PWM, and connection commands:
 
 ```
 src/
-├── OSCController.*         # OSC message handling and routing
+├── OSCController.*         # Incoming OSC message handling and routing
+├── OSCOutController.*      # Outgoing OSC to the hourglass hardware
 ├── HourGlassManager.*      # Multi-hourglass management
 ├── HourGlass.*             # Individual hourglass control
-├── LedMagnetController.*   # LED and electromagnet hardware control
+├── LedMagnetController.*   # LED and electromagnet command building
 ├── MotorController.*       # Motor movement and control
-├── SerialPortManager.*     # Serial communication management
+├── LedGeometry.h           # Shared LED arc math
+├── VezerPlayer.*           # Vezér XML sequence playback (sequencer panel)
+├── LEDVisualizer.*         # Live LED preview rendering
 ├── UIWrapper.*             # GUI interface and controls
 ├── OSCHelper.*             # OSC utility functions
 └── ofApp.*                 # Main application entry point
@@ -151,21 +154,12 @@ docs/OSC_API_Documentation.md    # Detailed API documentation
 
 ## Hardware Communication
 
-The system communicates with hourglass hardware via serial protocol using a custom CAN-like frame structure:
-
-```
-Frame Format: [START_BYTE][FLAGS][ID_BYTES][DATA][CHECKSUM][END_BYTE]
-- RGB Commands: 8 bytes (command + RGB + 4 effect parameter bytes)
-- Main LED: 2 bytes (command + brightness)
-- PWM: 2 bytes (command + PWM value)
-```
-
-## Serial Statistics
-
-Real-time monitoring of serial communication with rolling averages:
-- Commands per second (instant, 1s, 5s, 60-frame)
-- Bytes per second tracking
-- Connection status monitoring
+The app is **OSC-only**: it receives control messages on port 8000 and relays
+commands to the hourglass hardware as outgoing OSC (see
+`docs/OSC_OUT_DOCUMENTATION.md`). Motor commands are sent 3x with 10 ms spacing
+as a UDP-loss guard. The legacy serial/CAN transport was removed from this
+codebase; `bin/data/hourglasses.json` still carries `serialPort`/`baudRate`
+fields for compatibility, but they are unused.
 
 ## Open Source
 
@@ -193,8 +187,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Technical Specifications
 
-- **OSC Port**: 8000 (default)
-- **Serial Baud Rate**: Configurable per device
+- **OSC Port**: 8000 (default, incoming)
 - **LED Color Range**: 0-255 RGB
 - **Motor Speed Range**: 0-500
 - **Motor Acceleration**: 0-255
