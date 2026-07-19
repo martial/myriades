@@ -210,12 +210,17 @@ hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_STAGING" \
     -ov -format UDZO "$DMG_PATH"
 rm -rf "$DMG_STAGING"
 
+# The DMG itself must be signed too, or spctl rejects it with
+# "no usable signature" even when its contents are notarized
+codesign --force --sign "$SIGN_IDENTITY" --timestamp "$DMG_PATH"
+
 if [ $SKIP_NOTARIZE -eq 0 ]; then
     echo "  Notarizing DMG..."
     xcrun notarytool submit "$DMG_PATH" \
         --keychain-profile "$NOTARY_PROFILE" \
         --wait
     xcrun stapler staple "$DMG_PATH"
+    spctl --assess --type open --context context:primary-signature -vv "$DMG_PATH"
 fi
 
 rm -rf "$TMP_BIN_DIR"

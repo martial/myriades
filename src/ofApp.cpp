@@ -3,16 +3,27 @@
 //--------------------------------------------------------------
 void ofApp::setup() {
 	// Resolve data relative to the executable (cwd is "/" when launched from
-	// Finder). Prefer an external data/ folder next to the .app so settings
-	// saves never touch the signed bundle; fall back to bundled Resources/data
-	// so a bare .app still finds its fonts and settings.
+	// Finder). Prefer an external data/ folder next to the .app; for a bare
+	// .app, seed a writable copy of the bundled Resources/data into
+	// Application Support on first run. Settings saves must never write into
+	// the signed bundle — that breaks its codesign seal.
 	{
 		std::string exeDir = ofFilePath::getCurrentExeDir();
 		std::string externalData = exeDir + "../../../data/";
+		std::string bundledData = exeDir + "../Resources/data/";
 		if (ofDirectory(externalData).exists()) {
 			ofSetDataPathRoot(externalData);
-		} else {
-			ofSetDataPathRoot(exeDir + "../Resources/data/");
+		} else if (ofDirectory(bundledData).exists()) {
+			std::string appSupportData = ofFilePath::getUserHomeDir()
+				+ "/Library/Application Support/Myriades/data";
+			if (!ofDirectory(appSupportData).exists()
+				&& !ofDirectory(bundledData).copyTo(appSupportData, false, false)) {
+				ofLogError("ofApp") << "Could not seed " << appSupportData
+									<< ", using read-only bundled data";
+				ofSetDataPathRoot(bundledData);
+			} else {
+				ofSetDataPathRoot(appSupportData + "/");
+			}
 		}
 	}
 
