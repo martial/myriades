@@ -54,7 +54,7 @@ cd myriades
 of_v0.12.1_osx_release/
 ├── apps/
 │   └── myApps/
-│       └── emptyExample/          # ← Your project is here
+│       └── myriades/          # ← Your project is here
 │           ├── src/
 │           │   ├── HourGlass.cpp
 │           │   ├── OSCOutController.cpp
@@ -74,18 +74,18 @@ After setup completes, you can run the application in several ways:
 
 ### Using the Generated Run Script
 ```bash
-./run_emptyExample.sh
+./run_myriades.sh
 ```
 
 ### Manual Method
 ```bash
-cd of_v0.12.1_osx_release/apps/myApps/emptyExample
+cd of_v0.12.1_osx_release/apps/myApps/myriades
 make RunRelease
 ```
 
 ### Development Method (with automatic recompilation)
 ```bash
-cd of_v0.12.1_osx_release/apps/myApps/emptyExample
+cd of_v0.12.1_osx_release/apps/myApps/myriades
 make clean && make Release && make RunRelease
 ```
 
@@ -160,7 +160,7 @@ Contains the main configuration including OSC settings:
 ### Build Errors
 ```bash
 # Clean and rebuild
-cd of_v0.12.1_osx_release/apps/myApps/emptyExample
+cd of_v0.12.1_osx_release/apps/myApps/myriades
 make clean
 make Release
 ```

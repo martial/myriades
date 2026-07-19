@@ -55,7 +55,7 @@ cd <your-openframeworks-0.12.1>/apps/myApps
 git clone https://github.com/martial/myriades.git
 cd myriades
 
-make Release            # or: open emptyExample.xcodeproj
+make Release            # or: open myriades.xcodeproj
 ```
 
 **B. Anywhere on disk (make only):** clone wherever you like, then point

@@ -8,7 +8,7 @@ set -e  # Exit on any error
 # Configuration
 OF_VERSION="0.12.1"
 OF_PLATFORM="osx"
-PROJECT_NAME="emptyExample"
+PROJECT_NAME="myriades"
 REPO_URL="https://github.com/martial/myriades.git"
 REPO_BRANCH="main"
 
