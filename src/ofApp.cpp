@@ -2,6 +2,20 @@
 
 //--------------------------------------------------------------
 void ofApp::setup() {
+	// Resolve data relative to the executable (cwd is "/" when launched from
+	// Finder). Prefer an external data/ folder next to the .app so settings
+	// saves never touch the signed bundle; fall back to bundled Resources/data
+	// so a bare .app still finds its fonts and settings.
+	{
+		std::string exeDir = ofFilePath::getCurrentExeDir();
+		std::string externalData = exeDir + "../../../data/";
+		if (ofDirectory(externalData).exists()) {
+			ofSetDataPathRoot(externalData);
+		} else {
+			ofSetDataPathRoot(exeDir + "../Resources/data/");
+		}
+	}
+
 	ofSetWindowTitle("Myriades");
 	ofSetFrameRate(30);
 
