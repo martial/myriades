@@ -1,8 +1,14 @@
 # openFrameworks Project .gitignore
 
-# Build outputs and binaries
-bin/
+# Build outputs and binaries.
+# NOTE: git cannot re-include below an excluded DIRECTORY, so `bin/` + `!bin/data/`
+# does not work — exclude bin's children with `bin/*` instead, then whitelist.
+bin/*
 !bin/data/
+# Inside data/, track only what the app needs to run; runtime state XML stays local
+bin/data/*
+!bin/data/fonts/
+!bin/data/hourglasses.json
 obj/
 *.app
 *.exe

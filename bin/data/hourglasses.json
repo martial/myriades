@@ -1,0 +1,1 @@
+{"baudRate":0,"hourglasses":[{"downLedId":12,"motorId":1,"name":"HourGlass1","upLedId":11},{"downLedId":22,"motorId":2,"name":"HourGlass2","upLedId":21}],"serialPort":"tty.usbmodem1101"}
